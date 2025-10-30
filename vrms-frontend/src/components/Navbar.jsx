@@ -2,48 +2,36 @@ import { Link } from "react-router-dom";
 
 export default function Navbar() {
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
+    <nav className="fixed top-0 left-0 w-full z-50 bg-white/70 backdrop-blur-md shadow-sm border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Logo / Brand */}
-        <Link to="/" className="text-2xl font-bold text-blue-600 hover:text-blue-700 transition">
-          Volunteer<span className="text-green-600">Connect</span>
+        <Link
+          to="/"
+          className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-green-500 to-blue-600 bg-clip-text text-transparent hover:opacity-80 transition"
+        >
+          Volunteer<span className="text-gray-900">Connect</span>
         </Link>
 
-        {/* Nav Links */}
-        <div className="hidden md:flex space-x-8">
+        {/* Centered Nav Links as Buttons */}
+        <div className="flex flex-wrap justify-center gap-3">
           <Link
             to="/"
-            className="text-gray-700 font-medium hover:text-blue-600 transition duration-200"
+            className="px-5 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-all duration-200"
           >
             Home
           </Link>
           <Link
             to="/register"
-            className="text-gray-700 font-medium hover:text-green-600 transition duration-200"
+            className="px-5 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-all duration-200"
           >
             Register
           </Link>
           <Link
             to="/login"
-            className="text-gray-700 font-medium hover:text-blue-600 transition duration-200"
+            className="px-5 py-2 rounded-lg bg-gray-800 text-white font-medium hover:bg-gray-900 transition-all duration-200"
           >
             Login
           </Link>
-        </div>
-
-        {/* Mobile Menu (Optional Future Enhancement) */}
-        <div className="md:hidden text-gray-700">
-          <button className="focus:outline-none">
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
         </div>
       </div>
     </nav>

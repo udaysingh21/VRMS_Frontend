@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import Navbar from "../components/Navbar";
+import api from "../api/api"; 
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -7,86 +10,118 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
 
   const handleLogin = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  try {
-    const response = await fetch("http://127.0.0.1:61146/api/users/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const response = await api.post("/users/login", { email, password });
+      const data = response.data;
 
-    if (!response.ok) throw new Error("Invalid credentials");
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("refresh_token", data.refresh_token);
 
-    const data = await response.json();
+      alert("Login successful!");
 
-    // ✅ Save tokens
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("refresh_token", data.refresh_token);
+      const payload = JSON.parse(atob(data.access_token.split(".")[1]));
+      const role = payload.role?.toUpperCase() || "VOLUNTEER";
 
-    alert("✅ Login successful!");
-
-    // ✅ Decode JWT to extract role
-    const payload = JSON.parse(atob(data.access_token.split(".")[1]));
-    const role = payload.role || "VOLUNTEER"; // fallback if role missing
-
-    // ✅ Redirect based on role
-    switch (role.toUpperCase()) {
-      case "NGO":
-        navigate("/ngo-dashboard");
-        break;
-      case "CORPORATE":
-        navigate("/corporate-dashboard");
-        break;
-      case "ADMIN":
-        navigate("/admin-dashboard");
-        break;
-      default:
-        navigate("/volunteer-dashboard");
-        break;
+      switch (role) {
+        case "NGO":
+          navigate("/ngo-dashboard");
+          break;
+        case "CORPORATE":
+          navigate("/corporate-dashboard");
+          break;
+        case "ADMIN":
+          navigate("/admin-dashboard");
+          break;
+        default:
+          navigate("/volunteer-dashboard");
+          break;
+      }
+    } catch (error) {
+      console.error("Login Error:", error);
+      const errorMsg =
+        error.response?.data?.message || "Login failed. Please try again.";
+      alert(errorMsg);
     }
-  } catch (error) {
-    console.error("❌ Login error:", error);
-    alert("Login failed. Please check your credentials.");
-  }
-};
-
+  };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-      <div className="bg-white shadow-lg p-8 rounded-2xl w-full max-w-md">
-        <h2 className="text-2xl font-bold text-center mb-6 text-blue-700">User Login</h2>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-gray-600 mb-1">Email</label>
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50 relative overflow-hidden">
+      {/* Decorative background circles */}
+      <div className="absolute top-10 left-10 w-72 h-72 bg-blue-300/30 rounded-full blur-3xl -z-10"></div>
+      <div className="absolute bottom-10 right-10 w-72 h-72 bg-purple-300/30 rounded-full blur-3xl -z-10"></div>
+
+      {/* Navbar */}
+      <Navbar />
+
+      {/* Centered form */}
+      <main className="flex-grow flex justify-center items-center px-6 py-12">
+        <motion.div
+          className="w-full max-w-md bg-white/80 backdrop-blur-md shadow-2xl rounded-2xl p-10 border border-gray-100"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">
+            User Login
+          </h2>
+
+          <form onSubmit={handleLogin} className="space-y-5">
             <input
               type="email"
+              placeholder="Email Address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full border border-gray-300 rounded-lg p-2 focus:ring focus:ring-blue-200"
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
             />
-          </div>
-          <div>
-            <label className="block text-gray-600 mb-1">Password</label>
+
             <input
               type="password"
+              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full border border-gray-300 rounded-lg p-2 focus:ring focus:ring-blue-200"
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
             />
+
+            <button
+              type="submit"
+              className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
+            >
+              Login
+            </button>
+          </form>
+
+          {/* Register links */}
+          <div className="mt-6 text-center text-gray-600">
+            <p>Don’t have an account?</p>
+            <div className="mt-2 space-x-3">
+              <Link
+                to="/register/ngo"
+                className="text-blue-600 font-semibold hover:underline"
+              >
+                Register as NGO
+              </Link>
+              <span>•</span>
+              <Link
+                to="/register/corporate"
+                className="text-blue-600 font-semibold hover:underline"
+              >
+                Register as Corporate
+              </Link>
+              <span>•</span>
+              <Link
+                to="/register/volunteer"
+                className="text-blue-600 font-semibold hover:underline"
+              >
+                Register as Volunteer
+              </Link>
+            </div>
           </div>
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition"
-          >
-            Login
-          </button>
-        </form>
-      </div>
+        </motion.div>
+      </main>
     </div>
   );
 }

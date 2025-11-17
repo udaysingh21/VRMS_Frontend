@@ -11,6 +11,7 @@ import VolunteerRegister from "./pages/VolunteerRegister";
 import NGORegister from "./pages/NGORegister";
 import CorporateRegister from "./pages/CorporateRegister";
 import AboutPage from "./pages/AboutPage";
+import MatchingDashboard from "./pages/MatchingDashboard";
 
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
       <Route path="/register/volunteer" element={<VolunteerRegister />} />
       <Route path="/register/ngo" element={<NGORegister />} />
       <Route path="/register/corporate" element={<CorporateRegister />} />
+      <Route path="/matching-dashboard" element={<MatchingDashboard />} />
     </Routes>
   );
 }

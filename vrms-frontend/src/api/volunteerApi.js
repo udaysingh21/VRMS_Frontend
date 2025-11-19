@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Volunteer Service API (port 8080) for profile updates
-const VOLUNTEER_API_BASE_URL = "http://localhost:8080/api";
+const VOLUNTEER_API_BASE_URL = "http://localhost:8080/api/v1";
 
 const volunteerApi = axios.create({
   baseURL: VOLUNTEER_API_BASE_URL,

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8082/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api/v1";
 
 console.log("🔧 API Configuration:", { API_BASE_URL });
 
@@ -9,13 +9,19 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true, 
+  //  withCredentials: true, 
 });
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("access_token");
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+    // Don't add Authorization header for login and register endpoints
+    const isAuthEndpoint = config.url?.includes('/login') || config.url?.includes('/register');
+    
+    if (!isAuthEndpoint) {
+      const token = localStorage.getItem("access_token");
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+    }
+    
     return config;
   },
   (error) => Promise.reject(error)

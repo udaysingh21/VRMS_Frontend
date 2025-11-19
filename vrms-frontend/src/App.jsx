@@ -12,6 +12,7 @@ import NGORegister from "./pages/NGORegister";
 import CorporateRegister from "./pages/CorporateRegister";
 import AboutPage from "./pages/AboutPage";
 import MatchingDashboard from "./pages/MatchingDashboard";
+import MatchingOpportunities from "./pages/MatchingOpportunities";
 
 
 export default function App() {
@@ -29,6 +30,9 @@ export default function App() {
       <Route path="/register/ngo" element={<NGORegister />} />
       <Route path="/register/corporate" element={<CorporateRegister />} />
       <Route path="/matching-dashboard" element={<MatchingDashboard />} />
+        <Route path="/matching-opportunities" element={<MatchingOpportunities />} />
+
+
     </Routes>
   );
 }

@@ -494,7 +494,7 @@ export default function VolunteerDashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            onClick={() => navigate("/matching-dashboard")}
+            onClick={() => navigate("/opportunities")}
             className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-8 text-white cursor-pointer shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all"
           >
             <div className="text-4xl mb-4">🔍</div>

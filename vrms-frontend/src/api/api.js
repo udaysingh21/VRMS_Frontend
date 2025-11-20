@@ -9,19 +9,18 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  //  withCredentials: true, 
+  // withCredentials: true, // Removed to fix CORS issues
 });
 
 api.interceptors.request.use(
   (config) => {
+    const token = localStorage.getItem("access_token");
     // Don't add Authorization header for login and register endpoints
     const isAuthEndpoint = config.url?.includes('/login') || config.url?.includes('/register');
     
-    if (!isAuthEndpoint) {
-      const token = localStorage.getItem("access_token");
-      if (token) config.headers.Authorization = `Bearer ${token}`;
+    if (token && !isAuthEndpoint) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    
     return config;
   },
   (error) => Promise.reject(error)

@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
+import ngoService from "../api/ngoService";
 
 export default function NGODashboard() {
   const navigate = useNavigate();
+  const { ngoId } = useParams();
   const [ngoProfile, setNgoProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [editForm, setEditForm] = useState({});
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState("success");
@@ -27,17 +27,41 @@ export default function NGODashboard() {
     loadOpportunities();
     
     // Refresh opportunities when returning to this page
-    const handleFocus = () => {
-      loadOpportunities();
+    const handleFocus = async () => {
+      await loadOpportunities();
     };
     
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, []);
+  }, [ngoId]); // Add ngoId as dependency
 
-  const loadOpportunities = () => {
-    const savedOpportunities = JSON.parse(localStorage.getItem("ngoOpportunities") || "[]");
-    setOpportunities(savedOpportunities);
+  const loadOpportunities = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+
+      // Get NGO ID from JWT token
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const userId = payload.userId || payload.sub || payload.id;
+      
+      // Use NGO ID from URL params or fall back to token userId
+      const targetNgoId = ngoId || userId;
+      
+      console.log("🔍 Loading opportunities for NGO dashboard:", targetNgoId);
+      
+      const response = await ngoService.get(`/postings/ngo/${targetNgoId}`);
+      
+      console.log("✅ Opportunities loaded for dashboard:", response.data);
+      
+      // Handle both array response or paginated response
+      const opportunitiesData = Array.isArray(response.data) ? response.data : response.data.content || [];
+      
+      setOpportunities(opportunitiesData);
+    } catch (error) {
+      console.error("❌ Error loading opportunities for dashboard:", error);
+      // Set empty array on error to show "No opportunities yet" message
+      setOpportunities([]);
+    }
   };
 
   const fetchNgoProfile = async () => {
@@ -49,20 +73,47 @@ export default function NGODashboard() {
         return;
       }
 
-      // Decode token to get email
+      // Decode token to get user ID
       const payload = JSON.parse(atob(token.split(".")[1]));
-      const ngoEmail = payload.sub;
-
-      console.log("🔍 Fetching NGO profile for:", ngoEmail);
-      const response = await api.get(`/users/profile/${ngoEmail}`);
-      console.log("✅ NGO Profile loaded:", response.data);
+      console.log("🔍 JWT Payload:", payload);
+      
+      const userId = payload.userId || payload.sub || payload.id;
+      
+      // Use NGO ID from URL params or fall back to token userId
+      const targetNgoId = ngoId || userId;
+      
+      console.log("Fetching NGO profile for ID:", targetNgoId);
+      console.log("Using token:", token.substring(0, 50) + "...");
+      
+      const response = await api.get(`/users/ngos/${targetNgoId}`);
+      console.log("NGO Profile loaded:", response.data);
+      console.log("Phone from API:", response.data.phone);
+      console.log("Address from API:", response.data.address);
       
       setNgoProfile(response.data);
+      
+      // If no NGO ID in URL, redirect to include it
+      if (!ngoId && userId) {
+        navigate(`/ngo-dashboard/${userId}`, { replace: true });
+      }
     } catch (error) {
-      console.error("❌ Error fetching NGO profile:", error);
+      console.error("Error fetching NGO profile:", error);
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+      
       if (error.response?.status === 401) {
+        console.log("Unauthorized - clearing token and redirecting to login");
         localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
         navigate("/login");
+      } else if (error.response?.status === 403) {
+        // NGO can only view its own profile
+        console.error("Access denied: NGO can only view its own profile");
+        alert("Access denied: You can only view your own profile");
+        navigate("/login");
+      } else {
+        // For other errors, still show them but don't redirect
+        alert("Failed to load profile: " + (error.response?.data?.message || error.message));
       }
     } finally {
       setIsLoading(false);
@@ -82,64 +133,31 @@ export default function NGODashboard() {
     navigate("/");
   };
 
-  const openProfileModal = () => {
-    setShowProfileModal(true);
-    // Pre-populate form with current NGO data
-    setEditForm({
-      ...ngoProfile,
-      foundedYear: ngoProfile?.foundedYear || ""
-    });
-  };
-
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    try {
-      setIsLoading(true);
-      
-      const updateData = { ...editForm };
-      
-      // Convert foundedYear to number if provided
-      if (updateData.foundedYear) {
-        updateData.foundedYear = parseInt(updateData.foundedYear);
-      }
-      
-      // Remove undefined fields to prevent API issues
-      Object.keys(updateData).forEach(key => 
-        updateData[key] === undefined && delete updateData[key]
-      );
-      
-      console.log('Updating NGO profile with data:', updateData);
-      
-      // Update profile through user service
-      const response = await api.put("/users/profile", updateData);
-      
-      setNgoProfile(response.data);
-      setShowProfileModal(false);
-      showToastMessage("Profile updated successfully!", "success");
-      
-      // Refresh profile data
-      await fetchNgoProfile();
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      showToastMessage(
-        error.response?.data?.message || "Failed to update profile",
-        "error"
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleDeleteProfile = async () => {
     if (!window.confirm("Are you sure you want to delete your NGO profile? This action cannot be undone.")) {
       return;
     }
 
     try {
-      await api.delete("/users/profile");
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      // Get user ID from token
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const userId = payload.userId || payload.sub || payload.id;
+      
+      console.log("🗑️ Deleting NGO profile for user ID:", userId);
+      
+      // Use the correct API endpoint with user ID
+      await api.delete(`/users/${userId}`);
+      
       showToastMessage("Profile deleted successfully!", "success");
       setTimeout(() => {
         localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
         navigate("/");
       }, 2000);
     } catch (error) {
@@ -189,146 +207,7 @@ export default function NGODashboard() {
         )}
       </AnimatePresence>
 
-      {/* Profile Modal */}
-      <AnimatePresence>
-        {showProfileModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowProfileModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl p-8 max-w-5xl w-full max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">NGO Profile Details</h2>
-                <button
-                  onClick={() => setShowProfileModal(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ✕
-                </button>
-              </div>
 
-              {/* NGO Profile Form */}
-              <form onSubmit={handleUpdateProfile} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Organization Name</label>
-                    <input
-                      type="text"
-                      value={editForm.name || ""}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                    <input
-                      type="email"
-                      value={editForm.email || ""}
-                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100"
-                      disabled
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                    <input
-                      type="tel"
-                      value={editForm.phone || ""}
-                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Registration Number</label>
-                    <input
-                      type="text"
-                      value={editForm.registrationNumber || ""}
-                      onChange={(e) => setEditForm({ ...editForm, registrationNumber: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Founded Year</label>
-                    <input
-                      type="number"
-                      value={editForm.foundedYear || ""}
-                      onChange={(e) => setEditForm({ ...editForm, foundedYear: e.target.value })}
-                      min="1800"
-                      max={new Date().getFullYear()}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Sector</label>
-                    <input
-                      type="text"
-                      value={editForm.sector || ""}
-                      onChange={(e) => setEditForm({ ...editForm, sector: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
-                      placeholder="e.g., Education, Environment, Healthcare"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
-                    <input
-                      type="text"
-                      value={editForm.address || ""}
-                      onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Website URL</label>
-                    <input
-                      type="url"
-                      value={editForm.websiteUrl || ""}
-                      onChange={(e) => setEditForm({ ...editForm, websiteUrl: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
-                      placeholder="https://example.org"
-                    />
-                  </div>
-                  <div className="md:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Mission Statement</label>
-                    <textarea
-                      value={editForm.missionStatement || ""}
-                      onChange={(e) => setEditForm({ ...editForm, missionStatement: e.target.value })}
-                      rows={3}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
-                      placeholder="Describe your organization's mission and goals"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-center space-x-4 pt-6">
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-8 py-3 rounded-lg transition-colors font-medium"
-                  >
-                    {isLoading ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDeleteProfile}
-                    className="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-lg transition-colors font-medium"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Main Dashboard Content */}
       <main className="max-w-7xl mx-auto px-6 pt-24 pb-12">
@@ -340,13 +219,9 @@ export default function NGODashboard() {
         >
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-3">
-              <button
-                onClick={openProfileModal}
-                className="w-12 h-12 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
-                title="View Profile"
-              >
+              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg">
                 🏢
-              </button>
+              </div>
               <div>
                 <h1 className="text-4xl font-bold text-gray-800 mb-1">
                   Welcome, {ngoProfile?.name || 'NGO'}! 🌟
@@ -380,6 +255,10 @@ export default function NGODashboard() {
               <div className="flex justify-between">
                 <span className="text-gray-500">Name:</span>
                 <span className="font-medium">{ngoProfile?.name || 'Not provided'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Email:</span>
+                <span className="font-medium">{ngoProfile?.email || 'Not provided'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Founded:</span>
@@ -546,6 +425,26 @@ export default function NGODashboard() {
             </div>
           </motion.div>
         </div>
+
+        {/* Delete Profile Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="mt-16 bg-red-50 border border-red-200 rounded-2xl p-8 text-center"
+        >
+          <div className="text-4xl mb-4">⚠️</div>
+          <h3 className="text-xl font-bold text-red-800 mb-2">Danger Zone</h3>
+          <p className="text-red-600 mb-6">
+            Permanently delete your NGO profile and all associated data. This action cannot be undone.
+          </p>
+          <button
+            onClick={handleDeleteProfile}
+            className="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+          >
+            🗑️ Delete NGO Profile
+          </button>
+        </motion.div>
       </main>
     </div>
   );

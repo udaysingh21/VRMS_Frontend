@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter, Calendar, MapPin, Tag, Users, Clock, Mail, Phone, X } from 'lucide-react';
+import ngoService from '../api/ngoService';
 
 const BrowseOpportunities = () => {
   const [opportunities, setOpportunities] = useState([]);
   const [filteredOpportunities, setFilteredOpportunities] = useState([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     pincode: '',
     domain: '',
@@ -30,43 +33,124 @@ const BrowseOpportunities = () => {
   ];
 
   useEffect(() => {
-    // Load opportunities from localStorage (will be replaced with API call)
-    const savedOpportunities = localStorage.getItem('opportunities');
-    if (savedOpportunities) {
-      const opps = JSON.parse(savedOpportunities);
-      setOpportunities(opps);
-      setFilteredOpportunities(opps);
-    }
+    const fetchOpportunities = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        console.log("🔍 Fetching opportunities from NGO service...");
+        const response = await ngoService.get('/postings');
+        
+        console.log("✅ Opportunities loaded:", response.data);
+        
+        // Handle both array response or paginated response
+        const opportunitiesData = Array.isArray(response.data) ? response.data : response.data.content || [];
+        
+        setOpportunities(opportunitiesData);
+        setFilteredOpportunities(opportunitiesData);
+      } catch (error) {
+        console.error("❌ Error fetching opportunities:", error);
+        setError("Failed to load opportunities. Please try again later.");
+        
+        // Fallback to empty array
+        setOpportunities([]);
+        setFilteredOpportunities([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOpportunities();
   }, []);
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSearch = () => {
-    let filtered = opportunities;
+  const handleSearch = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      let endpoint = '/postings';
+      let filteredData = [];
+      
+      // If domain filter is selected, use domain-specific endpoint
+      if (filters.domain) {
+        console.log(`🔍 Fetching opportunities for domain: ${filters.domain}`);
+        endpoint = `/postings/domain/${encodeURIComponent(filters.domain)}`;
+      } else {
+        console.log("🔍 Fetching all opportunities...");
+      }
+      
+      const response = await ngoService.get(endpoint);
+      console.log(`✅ Opportunities loaded from ${endpoint}:`, response.data);
+      
+      // Handle both array response or paginated response
+      const opportunitiesData = Array.isArray(response.data) ? response.data : response.data.content || [];
+      
+      // Apply remaining filters on the client side (pincode and date)
+      let filtered = opportunitiesData;
 
-    if (filters.pincode) {
-      filtered = filtered.filter(opp => 
-        opp.pincode.includes(filters.pincode)
-      );
+      if (filters.pincode) {
+        filtered = filtered.filter(opp => 
+          opp.pincode && opp.pincode.toString().includes(filters.pincode)
+        );
+      }
+
+      if (filters.date) {
+        filtered = filtered.filter(opp => {
+          if (!opp.startDate) return false;
+          const oppDate = new Date(opp.startDate);
+          const filterDate = new Date(filters.date);
+          return oppDate >= filterDate;
+        });
+      }
+
+      setFilteredOpportunities(filtered);
+      
+      // Update main opportunities list if no domain filter (to maintain state)
+      if (!filters.domain) {
+        setOpportunities(opportunitiesData);
+      }
+      
+    } catch (error) {
+      console.error("❌ Error searching opportunities:", error);
+      setError("Failed to search opportunities. Please try again.");
+      setFilteredOpportunities([]);
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    if (filters.domain) {
-      filtered = filtered.filter(opp => 
-        opp.domain.toLowerCase() === filters.domain.toLowerCase()
-      );
+  const handleClearFilters = async () => {
+    // Reset filters
+    setFilters({
+      pincode: '',
+      domain: '',
+      date: ''
+    });
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log("🔄 Clearing filters and fetching all opportunities...");
+      const response = await ngoService.get('/postings');
+      
+      console.log("✅ All opportunities loaded:", response.data);
+      
+      // Handle both array response or paginated response
+      const opportunitiesData = Array.isArray(response.data) ? response.data : response.data.content || [];
+      
+      setOpportunities(opportunitiesData);
+      setFilteredOpportunities(opportunitiesData);
+    } catch (error) {
+      console.error("❌ Error clearing filters:", error);
+      setError("Failed to load opportunities. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-
-    if (filters.date) {
-      filtered = filtered.filter(opp => {
-        const oppDate = new Date(opp.startDate);
-        const filterDate = new Date(filters.date);
-        return oppDate >= filterDate;
-      });
-    }
-
-    setFilteredOpportunities(filtered);
   };
 
   const handleViewDetails = (opportunity) => {
@@ -153,20 +237,55 @@ const BrowseOpportunities = () => {
               />
             </div>
 
-            {/* Search Button */}
-            <div>
+            {/* Action Buttons */}
+            <div className="flex gap-2">
               <button
                 onClick={handleSearch}
-                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2"
+                disabled={isLoading}
+                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50"
               >
                 <Search className="w-4 h-4" />
-                Search
+                {isLoading ? 'Searching...' : 'Search'}
+              </button>
+              
+              <button
+                onClick={handleClearFilters}
+                disabled={isLoading}
+                className="bg-gray-500 text-white px-6 py-2 rounded-md hover:bg-gray-600 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+                Clear Filters
               </button>
             </div>
           </div>
         </motion.div>
 
-        {/* Opportunities List */}
+        {/* Loading State */}
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-12"
+          >
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading opportunities...</p>
+          </motion.div>
+        )}
+
+        {/* Error State */}
+        {error && !isLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-50 border border-red-200 rounded-lg p-6 mb-8 text-center"
+          >
+            <div className="text-red-600 text-lg font-medium mb-2">⚠️ Error Loading Opportunities</div>
+            <p className="text-red-600">{error}</p>
+          </motion.div>
+        )}
+
+        {/* Opportunities Grid */}
+        {!isLoading && !error && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -229,6 +348,7 @@ const BrowseOpportunities = () => {
             ))
           )}
         </motion.div>
+        )}
       </div>
 
       {/* Opportunity Details Popup */}

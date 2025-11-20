@@ -23,7 +23,9 @@ export default function App() {
       <Route path="/about" element={<AboutPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/volunteer-dashboard/:volunteerId" element={<VolunteerDashboard />} />
       <Route path="/volunteer-dashboard" element={<VolunteerDashboard />} />
+      <Route path="/ngo-dashboard/:ngoId" element={<NGODashboard />} />
       <Route path="/ngo-dashboard" element={<NGODashboard />} />
       <Route path="/corporate-dashboard" element={<CorporateDashboard />} />
       <Route path="/admin-dashboard" element={<AdminDashboard />} />

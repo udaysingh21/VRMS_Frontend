@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../components/Navbar";
-import api from "../api/api";
+import ngoService from "../api/ngoService";
 
 export default function OpportunityManagement() {
   const navigate = useNavigate();
@@ -11,51 +11,54 @@ export default function OpportunityManagement() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState("success");
 
   useEffect(() => {
     loadOpportunities();
-    seedSampleDataIfEmpty();
   }, []);
 
-  const seedSampleDataIfEmpty = () => {
-    const existing = JSON.parse(localStorage.getItem("ngoOpportunities") || "[]");
-    if (existing.length === 0) {
-      const sampleOpportunity = {
-        "id": 2,
-        "title": "Beach Cleanup",
-        "description": "Community beach cleanup",
-        "domain": "Environment",
-        "location": "Mumbai Beach",
-        "city": "Mumbai",
-        "state": "Maharashtra",
-        "country": "India",
-        "pincode": "400001",
-        "effortRequired": "3 hours",
-        "volunteersNeeded": 20,
-        "startDate": "2025-12-01",
-        "endDate": "2025-12-01",
-        "ngoId": 4,
-        "contactEmail": "contact@ngo.org",
-        "contactPhone": "9876543210",
-        "status": "ACTIVE",
-        "createdAt": "2025-11-19T15:58:00.563951",
-        "updatedAt": "2025-11-19T15:58:00.563993",
-        "volunteersSpotLeft": 20,
-        "volunteersRegistered": []
-      };
-      localStorage.setItem("ngoOpportunities", JSON.stringify([sampleOpportunity]));
-      setOpportunities([sampleOpportunity]);
+  const loadOpportunities = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Get NGO ID from JWT token
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+      
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const ngoId = payload.userId || payload.sub || payload.id;
+      
+      console.log("🔍 Fetching opportunities for NGO ID:", ngoId);
+      const response = await ngoService.get(`/postings/ngo/${ngoId}`);
+      
+      console.log("✅ NGO opportunities loaded:", response.data);
+      
+      // Handle both array response or paginated response
+      const opportunitiesData = Array.isArray(response.data) ? response.data : response.data.content || [];
+      
+      setOpportunities(opportunitiesData);
+    } catch (error) {
+      console.error("❌ Error loading opportunities:", error);
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem("access_token");
+        navigate("/login");
+        return;
+      }
+      
+      setError("Failed to load opportunities. Please try again later.");
+      setOpportunities([]);
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  const loadOpportunities = () => {
-    // Load from localStorage for now (will replace with API call later)
-    const savedOpportunities = JSON.parse(localStorage.getItem("ngoOpportunities") || "[]");
-    setOpportunities(savedOpportunities);
   };
 
   const showToastMessage = (message, type = "success") => {
@@ -73,41 +76,93 @@ export default function OpportunityManagement() {
   };
 
   const handleEditOpportunity = () => {
+    // Pre-populate edit form with current opportunity data
+    setEditForm({
+      title: selectedOpportunity.title || "",
+      description: selectedOpportunity.description || "",
+      domain: selectedOpportunity.domain || "",
+      location: selectedOpportunity.location || "",
+      city: selectedOpportunity.city || "",
+      state: selectedOpportunity.state || "",
+      country: selectedOpportunity.country || "",
+      pincode: selectedOpportunity.pincode || "",
+      effortRequired: selectedOpportunity.effortRequired || "",
+      volunteersNeeded: selectedOpportunity.volunteersNeeded || 1,
+      startDate: selectedOpportunity.startDate ? selectedOpportunity.startDate.split('T')[0] : "",
+      endDate: selectedOpportunity.endDate ? selectedOpportunity.endDate.split('T')[0] : "",
+      contactEmail: selectedOpportunity.contactEmail || "",
+      contactPhone: selectedOpportunity.contactPhone || "",
+      status: selectedOpportunity.status || "ACTIVE"
+    });
     setIsEditing(true);
   };
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     try {
-      // Update localStorage (will replace with API call later)
+      setIsLoading(true);
+      
+      const updateData = {
+        ...editForm,
+        volunteersNeeded: parseInt(editForm.volunteersNeeded) || 1
+      };
+      
+      console.log("🚀 Updating opportunity:", selectedOpportunity.id, updateData);
+      
+      const response = await ngoService.put(`/postings/${selectedOpportunity.id}`, updateData);
+      
+      console.log("✅ Opportunity updated successfully:", response.data);
+      
+      // Update the opportunity in the list
       const updatedOpportunities = opportunities.map(opp => 
-        opp.id === selectedOpportunity.id ? { ...editForm, updatedAt: new Date().toISOString() } : opp
+        opp.id === selectedOpportunity.id ? response.data : opp
       );
       setOpportunities(updatedOpportunities);
-      localStorage.setItem("ngoOpportunities", JSON.stringify(updatedOpportunities));
       
-      setSelectedOpportunity({ ...editForm, updatedAt: new Date().toISOString() });
+      // Update selected opportunity for the detail view
+      setSelectedOpportunity(response.data);
       setIsEditing(false);
       showToastMessage("Opportunity updated successfully!", "success");
     } catch (error) {
-      showToastMessage("Failed to update opportunity", "error");
+      console.error("Error updating opportunity:", error);
+      showToastMessage(
+        error.response?.data?.message || "Failed to update opportunity",
+        "error"
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleDeleteOpportunity = () => {
+  const handleDeleteOpportunity = async () => {
     if (!window.confirm("Are you sure you want to delete this opportunity?")) {
       return;
     }
 
     try {
-      // Remove from localStorage (will replace with API call later)
+      setIsLoading(true);
+      
+      console.log("Deleting opportunity:", selectedOpportunity.id);
+      
+      // Call the DELETE API endpoint
+      await ngoService.delete(`/postings/${selectedOpportunity.id}`);
+      
+      console.log("Opportunity deleted successfully");
+      
+      // Remove from local state after successful API call
       const updatedOpportunities = opportunities.filter(opp => opp.id !== selectedOpportunity.id);
       setOpportunities(updatedOpportunities);
-      localStorage.setItem("ngoOpportunities", JSON.stringify(updatedOpportunities));
       
       setShowDetailModal(false);
+      setSelectedOpportunity(null);
       showToastMessage("Opportunity deleted successfully!", "success");
     } catch (error) {
-      showToastMessage("Failed to delete opportunity", "error");
+      console.error("Error deleting opportunity:", error);
+      showToastMessage(
+        error.response?.data?.message || "Failed to delete opportunity",
+        "error"
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -396,6 +451,21 @@ export default function OpportunityManagement() {
                       />
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                      <select
+                        name="status"
+                        value={editForm.status || "ACTIVE"}
+                        onChange={handleChange}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
+                      >
+                        <option value="ACTIVE">Active</option>
+                        <option value="INACTIVE">Inactive</option>
+                        <option value="COMPLETED">Completed</option>
+                        <option value="CANCELLED">Cancelled</option>
+                      </select>
+                    </div>
+
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                       <textarea
@@ -448,7 +518,38 @@ export default function OpportunityManagement() {
           </button>
         </motion.div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-12"
+          >
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading your opportunities...</p>
+          </motion.div>
+        )}
+
+        {/* Error State */}
+        {error && !isLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-50 border border-red-200 rounded-lg p-6 mb-8 text-center"
+          >
+            <div className="text-red-600 text-lg font-medium mb-2">⚠️ Error Loading Opportunities</div>
+            <p className="text-red-600 mb-4">{error}</p>
+            <button
+              onClick={loadOpportunities}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors"
+            >
+              Try Again
+            </button>
+          </motion.div>
+        )}
+
         {/* Opportunities List */}
+        {!isLoading && !error && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {opportunities.length > 0 ? (
             opportunities.map((opportunity) => (
@@ -506,6 +607,7 @@ export default function OpportunityManagement() {
             </motion.div>
           )}
         </div>
+        )}
       </main>
     </div>
   );

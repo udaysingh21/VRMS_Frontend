@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../components/Navbar";
-import api from "../api/api";
+import ngoService from "../api/ngoService";
 
 export default function OpportunityCreation() {
   const navigate = useNavigate();
@@ -48,31 +48,32 @@ export default function OpportunityCreation() {
         volunteersNeeded: parseInt(formData.volunteersNeeded) || 1,
       };
 
-      // TODO: Replace localStorage with actual API call
-      // const response = await api.post("/opportunities", opportunityData);
+      console.log("🚀 Creating opportunity with data:", opportunityData);
       
-      // For now, we'll store in localStorage since we don't have opportunity service yet
-      const existingOpportunities = JSON.parse(localStorage.getItem("ngoOpportunities") || "[]");
-      const newOpportunity = {
-        ...opportunityData,
-        id: Date.now(), // Simple ID generation
-        status: "Active",
-        createdDate: new Date().toISOString(),
-      };
+      // Call the real NGO service API
+      const response = await ngoService.post("/postings", opportunityData);
       
-      existingOpportunities.push(newOpportunity);
-      localStorage.setItem("ngoOpportunities", JSON.stringify(existingOpportunities));
-
+      console.log("✅ Opportunity created successfully:", response.data);
       showToastMessage("Opportunity created successfully!", "success");
       
-      // Navigate back to dashboard after a short delay
+      // Navigate to manage opportunities page after a short delay
       setTimeout(() => {
-        navigate("/ngo-dashboard");
+        navigate("/manage-opportunities");
       }, 2000);
 
     } catch (error) {
-      console.error("Error creating opportunity:", error);
-      showToastMessage("Failed to create opportunity. Please try again.", "error");
+      console.error("❌ Error creating opportunity:", error);
+      
+      let errorMessage = "Failed to create opportunity. Please try again.";
+      if (error.response?.status === 403) {
+        errorMessage = "Access denied. Please check your permissions.";
+      } else if (error.response?.status === 400) {
+        errorMessage = "Invalid data. Please check your input.";
+      } else if (error.code === 'NETWORK_ERROR' || !error.response) {
+        errorMessage = "Network error. Please check if the service is running.";
+      }
+      
+      showToastMessage(errorMessage, "error");
     } finally {
       setIsLoading(false);
     }

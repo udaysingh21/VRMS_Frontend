@@ -22,11 +22,18 @@ export default function LoginPage() {
       alert("Login successful!");
 
       const payload = JSON.parse(atob(data.access_token.split(".")[1]));
+      console.log("🔍 Login JWT Payload:", payload);
+      
       const role = payload.role?.toUpperCase() || "VOLUNTEER";
+      const userId = payload.userId || payload.sub || payload.id;
+      
+      console.log("🔍 Extracted role:", role);
+      console.log("🔍 Extracted userId:", userId);
 
       switch (role) {
         case "NGO":
-          navigate("/ngo-dashboard");
+          console.log("Redirecting to NGO dashboard with ID:", userId);
+          navigate(`/ngo-dashboard/${userId}`);
           break;
         case "CORPORATE":
           navigate("/corporate-dashboard");
@@ -35,7 +42,8 @@ export default function LoginPage() {
           navigate("/admin-dashboard");
           break;
         default:
-          navigate("/volunteer-dashboard");
+          console.log("🔄 Redirecting to Volunteer dashboard with ID:", userId);
+          navigate(`/volunteer-dashboard/${userId}`);
           break;
       }
     } catch (error) {

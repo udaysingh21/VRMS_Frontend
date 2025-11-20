@@ -1,16 +1,15 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import api from "../api/api"; // User service (port 8082)
 import volunteerApi from "../api/volunteerApi"; // Volunteer service (port 8080)
 
 export default function VolunteerDashboard() {
   const navigate = useNavigate();
+  const { volunteerId } = useParams();
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [editForm, setEditForm] = useState({});
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState("success");
@@ -41,87 +40,74 @@ export default function VolunteerDashboard() {
         return;
       }
 
-      // Decode JWT to get user email/id
+      // Decode JWT to get user ID
       const payload = JSON.parse(atob(token.split(".")[1]));
-      const userEmail = payload.sub;
-
-      console.log("Fetching profile for:", userEmail);
+      const userId = payload.userId || payload.sub || payload.id;
       
-      // Get user profile from user service
-      const response = await api.get(`/users/profile/${userEmail}`);
+      // Use volunteer ID from URL params or fall back to token userId
+      const targetVolunteerId = volunteerId || userId;
+      
+      console.log("🔍 Fetching volunteer profile for ID:", targetVolunteerId);
+      
+      // Get volunteer profile from user service using specific volunteers endpoint
+      const response = await api.get(`/users/volunteers/${targetVolunteerId}`);
+      
+      console.log("Volunteer profile loaded:", response.data);
       setUserProfile(response.data);
-      setEditForm(response.data);
+      
+      // If no volunteer ID in URL, redirect to include it
+      if (!volunteerId && userId) {
+        navigate(`/volunteer-dashboard/${userId}`, { replace: true });
+      }
     } catch (error) {
       console.error("Error fetching user profile:", error);
-      showToastMessage("Error fetching profile data", "error");
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
       
       if (error.response?.status === 401) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
         navigate("/login");
+      } else if (error.response?.status === 403) {
+        console.error("Access denied: Volunteer can only view its own profile");
+        alert("Access denied: You can only view your own profile");
+        navigate("/login");
+      } else {
+        showToastMessage("Error fetching profile data", "error");
       }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    try {
-      setIsLoading(true);
-      
-      const updateData = { ...editForm };
-      
-      // Process array fields - convert strings to arrays if needed
-      if (updateData.skills && typeof updateData.skills === 'string') {
-        updateData.skills = updateData.skills.split(',').map(s => s.trim()).filter(s => s);
-      }
-      if (updateData.interests && typeof updateData.interests === 'string') {
-        updateData.interests = updateData.interests.split(',').map(s => s.trim()).filter(s => s);
-      }
-      if (updateData.languages && typeof updateData.languages === 'string') {
-        updateData.languages = updateData.languages.split(',').map(s => s.trim()).filter(s => s);
-      }
-      
-      // Remove undefined fields to prevent API issues
-      Object.keys(updateData).forEach(key => 
-        updateData[key] === undefined && delete updateData[key]
-      );
-      
-      console.log('Updating profile with data:', updateData);
-      
-      // Update profile through volunteer service (port 8080)
-      const response = await volunteerApi.put("/volunteers/profile", updateData);
-      
-      setUserProfile(response.data);
-      setShowProfileModal(false);
-      showToastMessage("Profile updated successfully!", "success");
-      
-      // Also refresh from user service to get latest data
-      await fetchUserProfile();
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      showToastMessage(
-        error.response?.data?.message || "Failed to update profile",
-        "error"
-      );
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleDeleteProfile = async () => {
-    if (!window.confirm("Are you sure you want to delete your profile? This action cannot be undone.")) {
+    if (!window.confirm("Are you sure you want to delete your volunteer profile? This action cannot be undone.")) {
       return;
     }
 
     try {
       setIsLoading(true);
-      await volunteerApi.delete("/volunteers/profile");
-      showToastMessage("Profile deleted successfully", "success");
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      // Get user ID from token
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const userId = payload.userId || payload.sub || payload.id;
       
-      // Clear tokens and redirect to home
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      navigate("/");
+      console.log("🗑️ Deleting volunteer profile for user ID:", userId);
+      
+      // Use the correct API endpoint with user ID
+      await api.delete(`/users/${userId}`);
+      
+      showToastMessage("Profile deleted successfully!", "success");
+      setTimeout(() => {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        navigate("/");
+      }, 2000);
     } catch (error) {
       console.error("Error deleting profile:", error);
       showToastMessage(
@@ -144,16 +130,6 @@ export default function VolunteerDashboard() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     navigate("/");
-  };
-
-  const openProfileModal = () => {
-    setShowProfileModal(true);
-    // Pre-populate form with current user data
-    setEditForm({
-      ...userProfile,
-      // Ensure date is in proper format for input field
-      dob: userProfile?.dob ? new Date(userProfile.dob).toISOString().split('T')[0] : ''
-    });
   };
 
   if (isLoading && !userProfile) {
@@ -191,166 +167,6 @@ export default function VolunteerDashboard() {
         )}
       </AnimatePresence>
 
-      {/* Profile Modal */}
-      <AnimatePresence>
-        {showProfileModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowProfileModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg bg-white/80 backdrop-blur-md shadow-2xl rounded-2xl p-10 border border-gray-100 max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-bold text-gray-800">Edit Profile</h2>
-                <button
-                  onClick={() => setShowProfileModal(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <form onSubmit={handleUpdateProfile} className="space-y-5">
-                {/* Name */}
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="Full Name"
-                  value={editForm.name || ""}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-                />
-
-                {/* Email */}
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Email Address"
-                  value={editForm.email || ""}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  disabled
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 bg-gray-100 focus:outline-none"
-                />
-
-                {/* Phone */}
-                <input
-                  type="text"
-                  name="phone"
-                  placeholder="Phone Number"
-                  value={editForm.phone || ""}
-                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-                />
-
-                {/* Address */}
-                <input
-                  type="text"
-                  name="address"
-                  placeholder="Address"
-                  value={editForm.address || ""}
-                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-                />
-
-                {/* DOB */}
-                <input
-                  type="date"
-                  name="dob"
-                  placeholder="Date of Birth"
-                  value={editForm.dob || ""}
-                  onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-                />
-
-                {/* Gender */}
-                <select
-                  name="gender"
-                  value={editForm.gender || ""}
-                  onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-                >
-                  <option value="">Select Gender</option>
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
-                </select>
-
-                {/* Skills */}
-                <input
-                  type="text"
-                  name="skills"
-                  placeholder="Skills (comma-separated)"
-                  value={Array.isArray(editForm.skills) ? editForm.skills.join(", ") : editForm.skills || ""}
-                  onChange={(e) => setEditForm({ ...editForm, skills: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-                />
-
-                {/* Interests */}
-                <input
-                  type="text"
-                  name="interests"
-                  placeholder="Interests (comma-separated)"
-                  value={Array.isArray(editForm.interests) ? editForm.interests.join(", ") : editForm.interests || ""}
-                  onChange={(e) => setEditForm({ ...editForm, interests: e.target.value })}
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-                />
-
-                {/* Availability */}
-                <input
-                  type="text"
-                  name="availability"
-                  placeholder="Availability (e.g., Weekends, Full-time)"
-                  value={editForm.availability || ""}
-                  onChange={(e) => setEditForm({ ...editForm, availability: e.target.value })}
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-                />
-
-                {/* Languages */}
-                <input
-                  type="text"
-                  name="languages"
-                  placeholder="Languages (comma-separated)"
-                  value={Array.isArray(editForm.languages) ? editForm.languages.join(", ") : editForm.languages || ""}
-                  onChange={(e) => setEditForm({ ...editForm, languages: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-700 focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-                />
-
-                <div className="flex justify-center space-x-4 pt-6">
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-8 py-3 rounded-lg transition-colors font-medium"
-                  >
-                    {isLoading ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDeleteProfile}
-                    className="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-lg transition-colors font-medium"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Main Dashboard Content - Added proper spacing from navbar */}
       <main className="max-w-7xl mx-auto px-6 pt-24 pb-12">
         {/* Welcome Section */}
@@ -361,13 +177,9 @@ export default function VolunteerDashboard() {
         >
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-3">
-              <button
-                onClick={openProfileModal}
-                className="w-12 h-12 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
-                title="View Profile"
-              >
+              <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-lg">
                 👤
-              </button>
+              </div>
               <div>
                 <h1 className="text-4xl font-bold text-gray-800 mb-1">
                   Welcome, {userProfile?.name?.split(' ')[0] || 'Volunteer'}! 👋
@@ -377,6 +189,12 @@ export default function VolunteerDashboard() {
             </div>
           </div>
           <div className="space-x-3">
+            <button
+              onClick={handleDeleteProfile}
+              className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
+            >
+              🗑️ Delete Profile
+            </button>
             <button
               onClick={handleLogout}
               className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
@@ -401,6 +219,10 @@ export default function VolunteerDashboard() {
               <div className="flex justify-between">
                 <span className="text-gray-500">Name:</span>
                 <span className="font-medium">{userProfile?.name || 'Not provided'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Email:</span>
+                <span className="font-medium">{userProfile?.email || 'Not provided'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Date of Birth:</span>

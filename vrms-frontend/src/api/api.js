@@ -27,3 +27,60 @@ api.interceptors.request.use(
 );
 
 export default api;
+
+// NGO Service (Port 8082)
+export const ngoService = axios.create({
+  baseURL: "http://localhost:8082/api/v1",
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+ngoService.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Analytics Service (Port 8000)
+export const analyticsService = axios.create({
+  baseURL: "http://localhost:8000",
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+analyticsService.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Matching Service (Port 8081)
+export const matchingService = axios.create({
+  baseURL: "http://localhost:8081/api/v1",
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+matchingService.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);

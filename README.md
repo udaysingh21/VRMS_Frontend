@@ -1,12 +1,12 @@
-# 🌟 Volunteer Resource Management System (VRMS) - Frontend
+# Volunteer Resource Management System (VRMS)
 
 A modern, responsive frontend application for managing volunteer resources and connecting volunteers with NGOs. This React-based application provides an intuitive interface for volunteers, NGOs, and administrators to efficiently manage volunteer activities and opportunities.
 
-## 📖 Project Overview
+## Project Overview
 
 The VRMS Frontend is the user interface layer of a comprehensive Volunteer Resource Management System that facilitates seamless interaction between volunteers and NGOs. Built with React and modern web technologies, it consumes APIs from multiple backend microservices to deliver a complete volunteer management experience.
 
-### 🎯 Key Features
+### Key Features
 
 - **User Authentication & Registration**: Secure login and registration for volunteers, NGOs, and administrators
 - **Volunteer Dashboard**: Manage profiles, browse opportunities, track applications and activity history
@@ -16,43 +16,43 @@ The VRMS Frontend is the user interface layer of a comprehensive Volunteer Resou
 - **Responsive Design**: Mobile-friendly interface with modern UI/UX
 - **Real-time Notifications**: Toast notifications for user actions and API responses
 
-## 🏗️ Architecture
+## Architecture
 
 This frontend application integrates with **5 backend microservices** to provide a complete volunteer management ecosystem:
 
-### 🔧 Backend Microservices Integration
+### Backend Microservices Integration
 
-1. **👤 User Service** (Port 8080)
+1. **User Service**
    - Handles user registration and authentication
    - Manages user profiles for volunteers, NGOs, and admins
    - JWT-based authentication system
    - User role management and permissions
 
-2. **🏢 NGO Posting Service** (Port 8082)
+2. **NGO Posting Service**
    - Manages NGO opportunity postings
    - Handles NGO profile management
    - Tracks volunteer applications and slot availability
    - Manages posting status and requirements
 
-3. **🙋 Volunteer Service** (Port 8083)
+3. **Volunteer Service**
    - Manages volunteer profiles and preferences
    - Tracks volunteer activities and history
    - Handles skill and interest management
    - Manages volunteer availability and schedules
 
-4. **🎯 Matching Service** (Port 8084)
+4. **Matching Service**
    - Intelligent matching of volunteers to opportunities
    - Algorithm-based recommendations
    - Skill and requirement compatibility analysis
    - Optimization for best-fit placements
 
-5. **📊 Analytics Service** (Port 8085)
+5. **Analytics Service**
    - Administrative monitoring and reporting
    - Portal activity analytics and insights
    - Performance metrics and trends
    - Data-driven decision support
 
-## 🚀 Technology Stack
+## Technology Stack
 
 - **Frontend Framework**: React 18
 - **Build Tool**: Vite
@@ -64,7 +64,7 @@ This frontend application integrates with **5 backend microservices** to provide
 - **Icons**: Emoji-based iconography
 - **Responsive Design**: CSS Grid & Flexbox
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 vrms-frontend/
@@ -89,7 +89,7 @@ vrms-frontend/
 └── README.md
 ```
 
-## 🛠️ Prerequisites
+## Prerequisites
 
 Before running this application, ensure you have the following installed:
 
@@ -98,14 +98,14 @@ Before running this application, ensure you have the following installed:
 - **Git**
 
 ### Backend Services
-Make sure all 5 backend microservices are running on their respective ports:
+Make sure all 5 backend microservices are running on their respective ports (local setup):
 - User Service: `http://localhost:8080`
 - NGO Posting Service: `http://localhost:8082`
 - Volunteer Service: `http://localhost:8083`
 - Matching Service: `http://localhost:8084`
 - Analytics Service: `http://localhost:8085`
 
-## 📦 Installation & Setup
+## Installation & Setup
 
 ### 1. Clone the Repository
 ```bash
@@ -132,7 +132,7 @@ npm run dev
 
 The application will be available at `http://localhost:5174`
 
-## 🚀 Available Scripts
+## Available Scripts
 
 | Command | Description |
 |---------|-------------|
@@ -141,7 +141,7 @@ The application will be available at `http://localhost:5174`
 | `npm run preview` | Preview production build locally |
 | `npm run lint` | Run ESLint for code quality |
 
-## 🌐 API Integration
+## API Integration
 
 The frontend communicates with backend services through well-defined API endpoints:
 
@@ -163,7 +163,7 @@ PUT /api/v1/postings/{id}
 DELETE /api/v1/postings/{id}
 ```
 
-## 🎨 Features
+## Features
 
 ### For Volunteers
 - ✅ Browse and search volunteer opportunities
@@ -183,7 +183,7 @@ DELETE /api/v1/postings/{id}
 - ✅ Monitor platform activity
 - ✅ Generate reports and insights
 
-## 🔒 Authentication
+## Authentication
 
 The application uses JWT (JSON Web Token) based authentication:
 - Secure login/logout functionality
@@ -191,13 +191,13 @@ The application uses JWT (JSON Web Token) based authentication:
 - Token storage in localStorage
 - Automatic token refresh handling
 
-## 🎯 User Roles
+## User Roles
 
 1. **Volunteers**: Browse opportunities, manage profiles, apply for positions
 2. **NGOs**: Post opportunities, manage applications, view volunteer profiles
 3. **Administrators**: System monitoring, analytics, and overall management
 
-## 🛡️ Security Features
+## Security Features
 
 - JWT-based authentication
 - Role-based route protection
@@ -205,14 +205,14 @@ The application uses JWT (JSON Web Token) based authentication:
 - Input validation and sanitization
 - Secure API communication
 
-## 📱 Responsive Design
+## Responsive Design
 
 - Mobile-first approach
 - Tablet and desktop optimized layouts
 - Touch-friendly interface
 - Consistent user experience across devices
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
@@ -220,17 +220,17 @@ The application uses JWT (JSON Web Token) based authentication:
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👥 Team
+## Team
 
 - **Frontend Development**: React.js with modern UI/UX
 - **Backend Integration**: RESTful API consumption
 - **System Architecture**: Microservices integration
 
-## 📞 Support
+## Support
 
 For support and questions:
 - Create an issue in the repository
@@ -239,4 +239,4 @@ For support and questions:
 
 ---
 
-**Built with ❤️ for the volunteer community**
+**Built for the volunteer community**

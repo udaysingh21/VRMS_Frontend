@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Search, Filter, Calendar, MapPin, Tag, Users, Clock, Mail, Phone, X, CheckCircle, AlertCircle } from 'lucide-react';
 import ngoService from '../api/ngoService';
 import { matchingService } from '../api/api';
-
+ 
 // Helper function to decode JWT token
 const decodeJWT = (token) => {
   try {
@@ -18,7 +18,7 @@ const decodeJWT = (token) => {
     return null;
   }
 };
-
+ 
 const BrowseOpportunities = () => {
   const [opportunities, setOpportunities] = useState([]);
   const [filteredOpportunities, setFilteredOpportunities] = useState([]);
@@ -34,7 +34,7 @@ const BrowseOpportunities = () => {
   const [registrationLoading, setRegistrationLoading] = useState(null);
   const [notification, setNotification] = useState(null);
   const [registeredOpportunities, setRegisteredOpportunities] = useState(new Set());
-
+ 
   // Domain options (same as NGO creation form)
   const domains = [
     'Education',
@@ -50,7 +50,7 @@ const BrowseOpportunities = () => {
     'Sports & Recreation',
     'Human Rights'
   ];
-
+ 
   useEffect(() => {
     const fetchOpportunities = async () => {
       try {
@@ -78,70 +78,130 @@ const BrowseOpportunities = () => {
         setIsLoading(false);
       }
     };
-
+ 
     fetchOpportunities();
   }, []);
-
+ 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
-
+ 
   const handleSearch = async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      let endpoint = '/postings';
-      let filteredData = [];
+      // Check if all three filters are applied - use recommendation API
+      const hasAllFilters = filters.pincode && filters.domain && filters.date;
       
-      // If domain filter is selected, use domain-specific endpoint
-      if (filters.domain) {
-        console.log(`Fetching opportunities for domain: ${filters.domain}`);
-        endpoint = `/postings/domain/${encodeURIComponent(filters.domain)}`;
+      if (hasAllFilters) {
+        // Get volunteer ID from JWT token for recommendations
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+          setError("Please login to get personalized recommendations.");
+          setFilteredOpportunities([]);
+          return;
+        }
+        
+        const decodedToken = decodeJWT(token);
+        if (!decodedToken || !decodedToken.user_id) {
+          setError("Invalid session. Please login again.");
+          setFilteredOpportunities([]);
+          return;
+        }
+        
+        const volunteerId = decodedToken.user_id;
+        
+        console.log(`🎯 Getting personalized recommendations for volunteer ${volunteerId}`);
+        
+        // Build query parameters for recommendation API
+        const params = new URLSearchParams();
+        if (filters.pincode) params.append('location', filters.pincode);
+        if (filters.domain) params.append('domain', filters.domain);
+        if (filters.date) params.append('date', filters.date);
+        
+        const endpoint = `/matching/recommend/${volunteerId}?${params.toString()}`;
+        console.log(`Calling recommendation API: ${endpoint}`);
+        
+        const response = await matchingService.get(endpoint);
+        console.log("Personalized recommendations received:", response.data);
+        
+        // Handle response - should be array of PostingResponse
+        const recommendedData = Array.isArray(response.data) ? response.data : [];
+        setFilteredOpportunities(recommendedData);
+        
       } else {
-        console.log("Fetching all opportunities...");
-      }
-      
-      const response = await ngoService.get(endpoint);
-      console.log(`Opportunities loaded from ${endpoint}:`, response.data);
-      
-      // Handle both array response or paginated response
-      const opportunitiesData = Array.isArray(response.data) ? response.data : response.data.content || [];
-      
-      // Apply remaining filters on the client side (pincode and date)
-      let filtered = opportunitiesData;
-
-      if (filters.pincode) {
-        filtered = filtered.filter(opp => 
-          opp.pincode && opp.pincode.toString().includes(filters.pincode)
-        );
-      }
-
-      if (filters.date) {
-        filtered = filtered.filter(opp => {
-          if (!opp.startDate) return false;
-          const oppDate = new Date(opp.startDate);
-          const filterDate = new Date(filters.date);
-          return oppDate >= filterDate;
-        });
-      }
-
-      setFilteredOpportunities(filtered);
-      
-      // Update main opportunities list if no domain filter (to maintain state)
-      if (!filters.domain) {
-        setOpportunities(opportunitiesData);
+        // Use existing logic for partial filters
+        let endpoint = '/postings';
+        
+        // If only domain filter is selected, use domain-specific endpoint
+        if (filters.domain && !filters.pincode && !filters.date) {
+          console.log(`Fetching opportunities for domain: ${filters.domain}`);
+          endpoint = `/postings/domain/${encodeURIComponent(filters.domain)}`;
+        } else {
+          console.log("Fetching all opportunities...");
+        }
+        
+        const response = await ngoService.get(endpoint);
+        console.log(`Opportunities loaded from ${endpoint}:`, response.data);
+        
+        // Handle both array response or paginated response
+        const opportunitiesData = Array.isArray(response.data) ? response.data : response.data.content || [];
+        
+        // Apply remaining filters on the client side
+        let filtered = opportunitiesData;
+ 
+        if (filters.pincode) {
+          filtered = filtered.filter(opp =>
+            opp.pincode && opp.pincode.toString().includes(filters.pincode)
+          );
+        }
+ 
+        if (filters.date) {
+          filtered = filtered.filter(opp => {
+            if (!opp.startDate) return false;
+            const oppDate = new Date(opp.startDate);
+            const filterDate = new Date(filters.date);
+            return oppDate >= filterDate;
+          });
+        }
+ 
+        setFilteredOpportunities(filtered);
+        
+        // Update main opportunities list if no domain filter (to maintain state)
+        if (!filters.domain) {
+          setOpportunities(opportunitiesData);
+        }
       }
       
     } catch (error) {
       console.error("Error searching opportunities:", error);
-      setError("Failed to search opportunities. Please try again.");
+      
+      if (error.response) {
+        const { status } = error.response;
+        
+        switch (status) {
+          case 401:
+            setError("Session expired. Please login again to get recommendations.");
+            localStorage.removeItem('access_token');
+            break;
+          case 404:
+            setError("No opportunities found matching your criteria.");
+            setFilteredOpportunities([]);
+            break;
+          default:
+            setError("Failed to search opportunities. Please try again.");
+        }
+      } else {
+        setError("Network error. Please check your connection.");
+      }
+      
       setFilteredOpportunities([]);
     } finally {
       setIsLoading(false);
     }
   };
-
+ 
   const handleClearFilters = async () => {
     // Reset filters
     setFilters({
@@ -171,111 +231,187 @@ const BrowseOpportunities = () => {
       setIsLoading(false);
     }
   };
-
+ 
   const handleViewDetails = (opportunity) => {
     setSelectedOpportunity(opportunity);
     setShowDetails(true);
   };
-
+ 
   const handleCloseDetails = () => {
     setShowDetails(false);
     setSelectedOpportunity(null);
   };
-
+ 
+  // const handleApply = async (opportunityId) => {
+  //   try {
+  //     setRegistrationLoading(opportunityId);
+      
+  //     // Get volunteer ID from JWT token
+  //     const token = localStorage.getItem('access_token');
+  //     if (!token) {
+  //       showNotification('Please login to register for opportunities', 'error');
+  //       return;
+  //     }
+      
+  //     const decodedToken = decodeJWT(token);
+  //     if (!decodedToken || !decodedToken.user_id) {
+  //       showNotification('Invalid session. Please login again.', 'error');
+  //       return;
+  //     }
+      
+  //     const volunteerId = decodedToken.user_id;
+      
+  //     // Check if already registered
+  //     if (registeredOpportunities.has(opportunityId)) {
+  //       showNotification('You are already registered for this opportunity!', 'warning');
+  //       return;
+  //     }
+      
+  //     console.log(`🤝 Registering volunteer ${volunteerId} for posting ${opportunityId}`);
+      
+  //     // Call matching service API
+  //     const response = await matchingService.post(`/matching/register/${volunteerId}/${opportunityId}`);
+      
+  //     console.log('Registration response:', response.data);
+      
+  //     // Add to registered opportunities
+  //     setRegisteredOpportunities(prev => new Set([...prev, opportunityId]));
+      
+  //     // Update opportunity slots in local state
+  //     setFilteredOpportunities(prev =>
+  //       prev.map(opp =>
+  //         opp.id === opportunityId
+  //           ? { ...opp, volunteersSpotLeft: Math.max(0, opp.volunteersSpotLeft - 1) }
+  //           : opp
+  //       )
+  //     );
+      
+  //     setOpportunities(prev =>
+  //       prev.map(opp =>
+  //         opp.id === opportunityId
+  //           ? { ...opp, volunteersSpotLeft: Math.max(0, opp.volunteersSpotLeft - 1) }
+  //           : opp
+  //       )
+  //     );
+      
+  //     showNotification('Successfully registered for this opportunity! 🎉', 'success');
+      
+  //   } catch (error) {
+  //     console.error('Registration error:', error);
+      
+  //     if (error.response) {
+  //       const { status, data } = error.response;
+        
+  //       switch (status) {
+  //         case 400:
+  //           // Handle the specific API response format with "error" and "message" fields
+  //           const errorMessage = data?.error || data?.message || '';
+  //           const fullMessage = data?.message || '';
+            
+  //           if (errorMessage.includes('Already Registered') || fullMessage.includes('already registered')) {
+  //             showNotification('You are already registered for this opportunity! ✅', 'warning');
+  //             setRegisteredOpportunities(prev => new Set([...prev, opportunityId]));
+  //           } else if (errorMessage.includes('no slots') || fullMessage.includes('no slots')) {
+  //             showNotification('Sorry, no slots available for this opportunity. 😔', 'error');
+  //           } else {
+  //             showNotification(fullMessage || errorMessage || 'Registration failed. Please try again.', 'error');
+  //           }
+  //           break;
+  //         case 401:
+  //           showNotification('Session expired. Please login again. 🔐', 'error');
+  //           localStorage.removeItem('access_token');
+  //           break;
+  //         case 404:
+  //           showNotification('Opportunity not found or volunteer profile incomplete. 📝', 'error');
+  //           break;
+  //         default:
+  //           showNotification('Registration failed. Please try again later. ⚠️', 'error');
+  //       }
+  //     } else {
+  //       showNotification('Network error. Please check your connection. 🌐', 'error');
+  //     }
+  //   } finally {
+  //     setRegistrationLoading(null);
+  //   }
+  // };
+  
   const handleApply = async (opportunityId) => {
     try {
       setRegistrationLoading(opportunityId);
-      
-      // Get volunteer ID from JWT token
       const token = localStorage.getItem('access_token');
       if (!token) {
         showNotification('Please login to register for opportunities', 'error');
         return;
       }
-      
       const decodedToken = decodeJWT(token);
-      if (!decodedToken || !decodedToken.user_id) {
+      const volunteerId = decodedToken?.userId || decodedToken?.user_id;
+      if (!volunteerId) {
         showNotification('Invalid session. Please login again.', 'error');
         return;
       }
-      
-      const volunteerId = decodedToken.user_id;
-      
-      // Check if already registered
       if (registeredOpportunities.has(opportunityId)) {
         showNotification('You are already registered for this opportunity!', 'warning');
         return;
       }
-      
-      console.log(`🤝 Registering volunteer ${volunteerId} for posting ${opportunityId}`);
-      
-      // Call matching service API
-      const response = await matchingService.post(`/matching/register/${volunteerId}/${opportunityId}`);
-      
-      console.log('Registration response:', response.data);
-      
-      // Add to registered opportunities
+      const response = await matchingService.post(
+        `/matching/register/${volunteerId}/${opportunityId}`,
+        null,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setRegisteredOpportunities(prev => new Set([...prev, opportunityId]));
-      
-      // Update opportunity slots in local state
-      setFilteredOpportunities(prev => 
-        prev.map(opp => 
-          opp.id === opportunityId 
-            ? { ...opp, volunteersSpotLeft: Math.max(0, opp.volunteersSpotLeft - 1) }
-            : opp
-        )
-      );
-      
-      setOpportunities(prev => 
-        prev.map(opp => 
-          opp.id === opportunityId 
-            ? { ...opp, volunteersSpotLeft: Math.max(0, opp.volunteersSpotLeft - 1) }
-            : opp
-        )
-      );
-      
+      setFilteredOpportunities(prev => prev.map(opp =>
+        opp.id === opportunityId
+          ? { ...opp, volunteersSpotLeft: Math.max(0, (opp.volunteersSpotLeft ?? 0) - 1) }
+          : opp
+      ));
+      setOpportunities(prev => prev.map(opp =>
+        opp.id === opportunityId
+          ? { ...opp, volunteersSpotLeft: Math.max(0, (opp.volunteersSpotLeft ?? 0) - 1) }
+          : opp
+      ));
       showNotification('Successfully registered for this opportunity! 🎉', 'success');
-      
     } catch (error) {
       console.error('Registration error:', error);
-      
       if (error.response) {
         const { status, data } = error.response;
-        
-        switch (status) {
-          case 400:
-            if (data?.message?.includes('already registered')) {
-              showNotification('You are already registered for this opportunity!', 'warning');
-              setRegisteredOpportunities(prev => new Set([...prev, opportunityId]));
-            } else if (data?.message?.includes('no slots')) {
-              showNotification('Sorry, no slots available for this opportunity.', 'error');
-            } else {
-              showNotification(data?.message || 'Registration failed. Please try again.', 'error');
-            }
-            break;
-          case 401:
-            showNotification('Session expired. Please login again.', 'error');
-            localStorage.removeItem('access_token');
-            break;
-          case 404:
-            showNotification('Opportunity not found or volunteer profile incomplete.', 'error');
-            break;
-          default:
-            showNotification('Registration failed. Please try again later.', 'error');
+        const err = data || {};
+        const errorMessage = err.error || '';
+        const fullMessage = err.message || '';
+        if (status === 400) {
+          if (
+            errorMessage.toLowerCase().includes('already registered') ||
+            fullMessage.toLowerCase().includes('already registered')
+          ) {
+            showNotification('You are already registered for this opportunity! ✅', 'warning');
+            setRegisteredOpportunities(prev => new Set([...prev, opportunityId]));
+          } else if (
+            errorMessage.toLowerCase().includes('no slots') ||
+            fullMessage.toLowerCase().includes('no slots')
+          ) {
+            showNotification('Sorry, no slots available for this opportunity. 😔', 'error');
+          } else {
+            showNotification(fullMessage || errorMessage || 'Registration failed. Please try again.', 'error');
+          }
+        } else if (status === 401) {
+          showNotification('Session expired. Please login again. 🔐', 'error');
+          localStorage.removeItem('access_token');
+        } else if (status === 404) {
+          showNotification('Opportunity or volunteer not found. 📝', 'error');
+        } else {
+          showNotification('Registration failed. Please try again later. ⚠️', 'error');
         }
       } else {
-        showNotification('Network error. Please check your connection.', 'error');
+        showNotification('Network error. Please check your connection. 🌐', 'error');
       }
     } finally {
       setRegistrationLoading(null);
     }
   };
-  
   const showNotification = (message, type) => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 5000);
   };
-
+ 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-6xl mx-auto">
@@ -289,7 +425,7 @@ const BrowseOpportunities = () => {
           <h1 className="text-4xl font-bold text-gray-800 mb-2">Browse Opportunities</h1>
           <p className="text-gray-600">Find volunteer opportunities that match your interests and availability</p>
         </motion.div>
-
+ 
         {/* Filter Bar */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -312,7 +448,7 @@ const BrowseOpportunities = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-
+ 
             {/* Domain Filter */}
             <div className="flex-1 min-w-[200px]">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -330,7 +466,7 @@ const BrowseOpportunities = () => {
                 ))}
               </select>
             </div>
-
+ 
             {/* Date Filter */}
             <div className="flex-1 min-w-[200px]">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -344,7 +480,7 @@ const BrowseOpportunities = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-
+ 
             {/* Action Buttons */}
             <div className="flex gap-2">
               <button
@@ -353,7 +489,8 @@ const BrowseOpportunities = () => {
                 className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50"
               >
                 <Search className="w-4 h-4" />
-                {isLoading ? 'Searching...' : 'Search'}
+                {isLoading ? 'Searching...' :
+                 (filters.pincode && filters.domain && filters.date) ? 'Get Recommendations' : 'Search'}
               </button>
               
               <button
@@ -367,7 +504,7 @@ const BrowseOpportunities = () => {
             </div>
           </div>
         </motion.div>
-
+ 
         {/* Loading State */}
         {isLoading && (
           <motion.div
@@ -379,7 +516,7 @@ const BrowseOpportunities = () => {
             <p className="mt-4 text-gray-600">Loading opportunities...</p>
           </motion.div>
         )}
-
+ 
         {/* Error State */}
         {error && !isLoading && (
           <motion.div
@@ -391,7 +528,7 @@ const BrowseOpportunities = () => {
             <p className="text-red-600">{error}</p>
           </motion.div>
         )}
-
+ 
         {/* Opportunities Grid */}
         {!isLoading && !error && (
         <motion.div
@@ -415,7 +552,7 @@ const BrowseOpportunities = () => {
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h3 
+                    <h3
                       className="text-xl font-semibold text-blue-600 mb-2 cursor-pointer hover:text-blue-800 transition-colors"
                       onClick={() => handleViewDetails(opportunity)}
                     >
@@ -479,7 +616,7 @@ const BrowseOpportunities = () => {
         </motion.div>
         )}
       </div>
-
+ 
       {/* Opportunity Details Popup */}
       {showDetails && selectedOpportunity && (
         <motion.div
@@ -505,7 +642,7 @@ const BrowseOpportunities = () => {
                   <X className="w-6 h-6" />
                 </button>
               </div>
-
+ 
               {/* Details Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
@@ -533,7 +670,7 @@ const BrowseOpportunities = () => {
                     <p className="text-gray-600">{selectedOpportunity.effortRequired}</p>
                   </div>
                 </div>
-
+ 
                 <div className="space-y-4">
                   <div>
                     <h3 className="font-semibold text-gray-700 mb-1">Volunteers Needed</h3>
@@ -569,8 +706,8 @@ const BrowseOpportunities = () => {
                   <div>
                     <h3 className="font-semibold text-gray-700 mb-1">Status</h3>
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      selectedOpportunity.status === 'ACTIVE' 
-                        ? 'bg-green-100 text-green-800' 
+                      selectedOpportunity.status === 'ACTIVE'
+                        ? 'bg-green-100 text-green-800'
                         : 'bg-gray-100 text-gray-800'
                     }`}>
                       {selectedOpportunity.status}
@@ -578,7 +715,7 @@ const BrowseOpportunities = () => {
                   </div>
                 </div>
               </div>
-
+ 
               {/* Action Buttons */}
               <div className="flex justify-end gap-4 mt-8">
                 <button
@@ -648,5 +785,5 @@ const BrowseOpportunities = () => {
     </div>
   );
 };
-
+ 
 export default BrowseOpportunities;

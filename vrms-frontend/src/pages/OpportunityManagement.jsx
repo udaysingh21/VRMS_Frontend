@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft } from "lucide-react";
 import Navbar from "../components/Navbar";
 import ngoService from "../api/ngoService";
 
@@ -500,6 +501,22 @@ export default function OpportunityManagement() {
       </AnimatePresence>
 
       <main className="max-w-7xl mx-auto px-6 pt-24 pb-12">
+        {/* Back Button */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+          className="mb-6"
+        >
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 text-gray-700 hover:text-green-600 hover:bg-green-50"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-medium">Back</span>
+          </button>
+        </motion.div>
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

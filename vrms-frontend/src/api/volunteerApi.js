@@ -50,4 +50,17 @@ volunteerApi.interceptors.response.use(
   }
 );
 
+// API Functions
+export const registerVolunteerForPosting = (volunteerId, postingId) => {
+  return volunteerApi.post(`/users/volunteers/${volunteerId}/postings/${postingId}`);
+};
+
+export const getVolunteerRegisteredPostings = (volunteerId) => {
+  return volunteerApi.get(`/users/volunteers/${volunteerId}/postings`);
+};
+
+export const unregisterVolunteerFromPosting = (volunteerId, postingId) => {
+  return volunteerApi.delete(`/users/volunteers/${volunteerId}/postings/${postingId}`);
+};
+
 export default volunteerApi;

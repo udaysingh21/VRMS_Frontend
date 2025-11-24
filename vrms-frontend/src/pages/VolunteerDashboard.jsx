@@ -14,17 +14,9 @@ export default function VolunteerDashboard() {
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState("success");
 
-  // Mock data for applications and activities
-  const [applications] = useState([
-    { id: 1, title: "Beach Cleanup Drive", organization: "Green Earth NGO", status: "Applied", date: "2025-11-20" },
-    { id: 2, title: "Food Distribution", organization: "Helping Hands", status: "Confirmed", date: "2025-11-25" },
-  ]);
 
-  const [activityHistory] = useState([
-    { id: 1, title: "Tree Plantation Drive", organization: "EcoWarriors", status: "Completed", date: "2025-10-15" },
-    { id: 2, title: "Blood Donation Camp", organization: "Red Cross", status: "Completed", date: "2025-09-28" },
-    { id: 3, title: "Teaching Kids", organization: "Education First", status: "Upcoming", date: "2025-12-05" },
-  ]);
+
+
 
   // Fetch user profile from user service (port 8082)
   useEffect(() => {
@@ -215,30 +207,30 @@ export default function VolunteerDashboard() {
             <div className="text-3xl mb-4">👤</div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">Personal Details</h3>
             <p className="text-gray-600 text-sm mb-4">Your basic information</p>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Name:</span>
-                <span className="font-medium">{userProfile?.name || 'Not provided'}</span>
+            <div className="space-y-3">
+              <div className="flex justify-between items-start">
+                <span className="text-gray-500 text-sm">Name:</span>
+                <span className="font-medium text-sm text-right flex-1 ml-2">{userProfile?.name || 'Not provided'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Email:</span>
-                <span className="font-medium">{userProfile?.email || 'Not provided'}</span>
+              <div className="flex justify-between items-start">
+                <span className="text-gray-500 text-sm">Email:</span>
+                <span className="font-medium text-sm text-right flex-1 ml-2 break-words">{userProfile?.email || 'Not provided'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Date of Birth:</span>
-                <span className="font-medium">{userProfile?.dob ? new Date(userProfile.dob).toLocaleDateString() : 'Not provided'}</span>
+              <div className="flex justify-between items-start">
+                <span className="text-gray-500 text-sm">Date of Birth:</span>
+                <span className="font-medium text-sm text-right flex-1 ml-2">{userProfile?.dob ? new Date(userProfile.dob).toLocaleDateString() : 'Not provided'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Gender:</span>
-                <span className="font-medium">{userProfile?.gender || 'Not provided'}</span>
+              <div className="flex justify-between items-start">
+                <span className="text-gray-500 text-sm">Gender:</span>
+                <span className="font-medium text-sm text-right flex-1 ml-2">{userProfile?.gender || 'Not provided'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Phone:</span>
-                <span className="font-medium">{userProfile?.phone || 'Not provided'}</span>
+              <div className="flex justify-between items-start">
+                <span className="text-gray-500 text-sm">Phone:</span>
+                <span className="font-medium text-sm text-right flex-1 ml-2">{userProfile?.phone || 'Not provided'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Address:</span>
-                <span className="font-medium">{userProfile?.address ? `${userProfile.address.substring(0, 20)}...` : 'Not provided'}</span>
+              <div className="flex justify-between items-start">
+                <span className="text-gray-500 text-sm">Address:</span>
+                <span className="font-medium text-sm text-right flex-1 ml-2 break-words leading-relaxed">{userProfile?.address || 'Not provided'}</span>
               </div>
             </div>
           </motion.div>
@@ -311,66 +303,84 @@ export default function VolunteerDashboard() {
         </div>
 
         {/* Action Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            onClick={() => navigate("/opportunities")}
-            className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-8 text-white cursor-pointer shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all"
-          >
-            <div className="text-4xl mb-4">🔍</div>
-            <h3 className="text-2xl font-bold mb-3">Browse Opportunities</h3>
-            <p className="text-blue-100 mb-4">
-              Discover volunteer opportunities that match your skills and interests
-            </p>
-            <div className="flex items-center text-blue-100">
-              <span>Explore now</span>
-              <span className="ml-2">→</span>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-8 text-white shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all cursor-pointer"
-          >
-            <div className="text-4xl mb-4">📋</div>
-            <h3 className="text-2xl font-bold mb-3">My Applications</h3>
-            <p className="text-green-100 mb-4">
-              Track your volunteer applications and manage commitments
-            </p>
-            <div className="space-y-2">
-              {applications.slice(0, 2).map(app => (
-                <div key={app.id} className="bg-white/20 rounded-lg p-2 text-sm">
-                  <div className="font-medium">{app.title}</div>
-                  <div className="text-green-100 text-xs">{app.status} • {app.date}</div>
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 justify-center">
+            {/* Browse Opportunities Card */}
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
+              onClick={() => navigate("/opportunities")}
+              className="group bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 rounded-3xl p-8 text-white cursor-pointer shadow-2xl hover:shadow-blue-500/25 transform hover:scale-[1.02] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden"
+            >
+              {/* Background decoration */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16 group-hover:scale-110 transition-transform duration-500"></div>
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12 group-hover:scale-125 transition-transform duration-700"></div>
+              
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="text-6xl group-hover:scale-110 transition-transform duration-300">🔍</div>
+                  <div className="bg-white/20 rounded-full p-3 group-hover:bg-white/30 transition-colors duration-300">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-8 text-white shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all cursor-pointer"
-          >
-            <div className="text-4xl mb-4">📈</div>
-            <h3 className="text-2xl font-bold mb-3">Activity History</h3>
-            <p className="text-purple-100 mb-4">
-              View your volunteer journey and track your impact
-            </p>
-            <div className="space-y-2">
-              {activityHistory.slice(0, 2).map(activity => (
-                <div key={activity.id} className="bg-white/20 rounded-lg p-2 text-sm">
-                  <div className="font-medium">{activity.title}</div>
-                  <div className="text-purple-100 text-xs">{activity.status} • {activity.date}</div>
+                
+                <h3 className="text-3xl font-bold mb-4 group-hover:text-blue-100 transition-colors">Browse Opportunities</h3>
+                <p className="text-blue-100 mb-6 leading-relaxed">
+                  Discover meaningful volunteer opportunities that align with your passion and skills. Make a difference in your community.
+                </p>
+                
+                <div className="flex items-center justify-between">
+                  <div className="text-sm bg-white/20 rounded-full px-4 py-2 backdrop-blur-sm">
+                    Start exploring
+                  </div>
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                    <div className="w-2 h-2 bg-white/40 rounded-full"></div>
+                    <div className="w-2 h-2 bg-white/30 rounded-full"></div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </motion.div>
+              </div>
+            </motion.div>
+
+            {/* My Applications Card */}
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5, duration: 0.6 }}
+              onClick={() => navigate(`/my-applications/${volunteerId || userProfile?.id}`)}
+              className="group bg-gradient-to-br from-green-500 via-green-600 to-emerald-700 rounded-3xl p-8 text-white cursor-pointer shadow-2xl hover:shadow-green-500/25 transform hover:scale-[1.02] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden"
+            >
+              {/* Background decoration */}
+              <div className="absolute top-0 left-0 w-28 h-28 bg-white/10 rounded-full -translate-y-14 -translate-x-14 group-hover:scale-110 transition-transform duration-500"></div>
+              <div className="absolute bottom-0 right-0 w-36 h-36 bg-white/5 rounded-full translate-y-18 translate-x-18 group-hover:scale-125 transition-transform duration-700"></div>
+              
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="text-6xl group-hover:scale-110 transition-transform duration-300">📋</div>
+                  <div className="bg-white/20 rounded-full p-3 group-hover:bg-white/30 transition-colors duration-300">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+                
+                <h3 className="text-3xl font-bold mb-4 group-hover:text-green-100 transition-colors">My Applications</h3>
+                <p className="text-green-100 mb-4 leading-relaxed">
+                  Track your volunteer applications and manage your commitments. Stay organized and engaged.
+                </p>
+                
+                <div className="flex items-center justify-between">
+                  <div className="text-sm bg-white/20 rounded-full px-4 py-2 backdrop-blur-sm">
+                    View Applications
+                  </div>
+                  <div className="text-2xl group-hover:translate-x-1 transition-transform duration-300">→</div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </div>
       </main>
     </div>

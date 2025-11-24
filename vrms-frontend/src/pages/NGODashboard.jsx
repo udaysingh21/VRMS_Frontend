@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../components/Navbar";
 import api from "../api/api";
-import ngoService from "../api/ngoService";
 
 export default function NGODashboard() {
   const navigate = useNavigate();
@@ -14,55 +13,15 @@ export default function NGODashboard() {
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState("success");
 
-  // Load opportunities from localStorage instead of hardcoded data
-  const [opportunities, setOpportunities] = useState([]);
 
-  const [applications] = useState([
-    { id: 1, volunteer: "John Doe", opportunity: "Beach Cleanup", status: "Approved", date: "2025-11-20" },
-    { id: 2, volunteer: "Jane Smith", opportunity: "Food Drive", status: "Pending", date: "2025-11-22" },
-  ]);
+
+
 
   useEffect(() => {
     fetchNgoProfile();
-    loadOpportunities();
-    
-    // Refresh opportunities when returning to this page
-    const handleFocus = async () => {
-      await loadOpportunities();
-    };
-    
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
   }, [ngoId]); // Add ngoId as dependency
 
-  const loadOpportunities = async () => {
-    try {
-      const token = localStorage.getItem("access_token");
-      if (!token) return;
 
-      // Get NGO ID from JWT token
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      const userId = payload.userId || payload.sub || payload.id;
-      
-      // Use NGO ID from URL params or fall back to token userId
-      const targetNgoId = ngoId || userId;
-      
-      console.log("🔍 Loading opportunities for NGO dashboard:", targetNgoId);
-      
-      const response = await ngoService.get(`/postings/ngo/${targetNgoId}`);
-      
-      console.log("✅ Opportunities loaded for dashboard:", response.data);
-      
-      // Handle both array response or paginated response
-      const opportunitiesData = Array.isArray(response.data) ? response.data : response.data.content || [];
-      
-      setOpportunities(opportunitiesData);
-    } catch (error) {
-      console.error("❌ Error loading opportunities for dashboard:", error);
-      // Set empty array on error to show "No opportunities yet" message
-      setOpportunities([]);
-    }
-  };
 
   const fetchNgoProfile = async () => {
     try {
@@ -351,79 +310,80 @@ export default function NGODashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            onClick={() => navigate("/manage-opportunities")}
-            className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-8 text-white shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all cursor-pointer"
-          >
-            <div className="text-4xl mb-4">📋</div>
-            <h3 className="text-2xl font-bold mb-3">Manage Opportunities</h3>
-            <p className="text-green-100 mb-4">
-              Create and manage volunteer opportunities for your organization
-            </p>
-            <div className="space-y-2">
-              {opportunities.length > 0 ? (
-                opportunities.slice(0, 2).map(opportunity => (
-                  <div key={opportunity.id} className="bg-white/20 rounded-lg p-2 text-sm">
-                    <div className="font-medium">{opportunity.title}</div>
-                    <div className="text-green-100 text-xs">{opportunity.volunteersNeeded} volunteers needed • {opportunity.status}</div>
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 justify-center">
+            {/* Manage Opportunities Card */}
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
+              onClick={() => navigate("/manage-opportunities")}
+              className="group bg-gradient-to-br from-green-500 via-green-600 to-emerald-700 rounded-3xl p-8 text-white cursor-pointer shadow-2xl hover:shadow-green-500/25 transform hover:scale-[1.02] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden"
+            >
+              {/* Background decoration */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16 group-hover:scale-110 transition-transform duration-500"></div>
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12 group-hover:scale-125 transition-transform duration-700"></div>
+              
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="text-6xl group-hover:scale-110 transition-transform duration-300">📋</div>
+                  <div className="bg-white/20 rounded-full p-3 group-hover:bg-white/30 transition-colors duration-300">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
                   </div>
-                ))
-              ) : (
-                <div className="bg-white/20 rounded-lg p-2 text-sm">
-                  <div className="font-medium">No opportunities yet</div>
-                  <div className="text-green-100 text-xs">Click to create your first opportunity</div>
                 </div>
-              )}
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-8 text-white shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all cursor-pointer"
-          >
-            <div className="text-4xl mb-4">👥</div>
-            <h3 className="text-2xl font-bold mb-3">Volunteer Applications</h3>
-            <p className="text-blue-100 mb-4">
-              Review and manage volunteer applications for your opportunities
-            </p>
-            <div className="space-y-2">
-              {applications.slice(0, 2).map(app => (
-                <div key={app.id} className="bg-white/20 rounded-lg p-2 text-sm">
-                  <div className="font-medium">{app.volunteer}</div>
-                  <div className="text-blue-100 text-xs">{app.status} • {app.date}</div>
+                
+                <h3 className="text-3xl font-bold mb-4 group-hover:text-green-100 transition-colors">Manage Opportunities</h3>
+                <p className="text-green-100 mb-4 leading-relaxed">
+                  Create and manage volunteer opportunities for your organization. Build meaningful connections with volunteers.
+                </p>
+                
+                <div className="flex items-center justify-between">
+                  <div className="text-sm bg-white/20 rounded-full px-4 py-2 backdrop-blur-sm">
+                    Manage Opportunities
+                  </div>
+                  <div className="text-2xl group-hover:translate-x-1 transition-transform duration-300">→</div>
                 </div>
-              ))}
-            </div>
-          </motion.div>
+              </div>
+            </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-8 text-white shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all cursor-pointer"
-          >
-            <div className="text-4xl mb-4">📊</div>
-            <h3 className="text-2xl font-bold mb-3">Analytics & Reports</h3>
-            <p className="text-purple-100 mb-4">
-              Track your organization's impact and volunteer engagement
-            </p>
-            <div className="space-y-2">
-              <div className="bg-white/20 rounded-lg p-2 text-sm">
-                <div className="font-medium">Total Volunteers: 45</div>
-                <div className="text-purple-100 text-xs">Active this month</div>
+            {/* Volunteer Applications Card */}
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5, duration: 0.6 }}
+              onClick={() => navigate(`/volunteer-applications/${ngoId || ngoProfile?.id}`)}
+              className="group bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 rounded-3xl p-8 text-white cursor-pointer shadow-2xl hover:shadow-blue-500/25 transform hover:scale-[1.02] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden"
+            >
+              {/* Background decoration */}
+              <div className="absolute top-0 left-0 w-28 h-28 bg-white/10 rounded-full -translate-y-14 -translate-x-14 group-hover:scale-110 transition-transform duration-500"></div>
+              <div className="absolute bottom-0 right-0 w-36 h-36 bg-white/5 rounded-full translate-y-18 translate-x-18 group-hover:scale-125 transition-transform duration-700"></div>
+              
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="text-6xl group-hover:scale-110 transition-transform duration-300">👥</div>
+                  <div className="bg-white/20 rounded-full p-3 group-hover:bg-white/30 transition-colors duration-300">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+                
+                <h3 className="text-3xl font-bold mb-4 group-hover:text-blue-100 transition-colors">Volunteer Applications</h3>
+                <p className="text-blue-100 mb-4 leading-relaxed">
+                  Review and manage volunteer applications for your opportunities. Connect with passionate volunteers.
+                </p>
+                
+                <div className="flex items-center justify-between">
+                  <div className="text-sm bg-white/20 rounded-full px-4 py-2 backdrop-blur-sm">
+                    Manage Applications
+                  </div>
+                  <div className="text-2xl group-hover:translate-x-1 transition-transform duration-300">→</div>
+                </div>
               </div>
-              <div className="bg-white/20 rounded-lg p-2 text-sm">
-                <div className="font-medium">Opportunities: 8</div>
-                <div className="text-purple-100 text-xs">Currently available</div>
-              </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </div>
 
         {/* Delete Profile Section */}

@@ -1,0 +1,9 @@
+// Update this line in your NgoPostController.java in the getVolunteerDetailsForPosting method:
+
+// FROM:
+String volunteerEndpoint = userServiceUrl + "/api/v1/users/volunteers/" + volunteerId;
+
+// TO:
+String volunteerEndpoint = userServiceUrl + "/api/v1/users/volunteers/" + volunteerId + "/ngo-access";
+
+// This change will make your NGO service use the new endpoint that allows NGO access

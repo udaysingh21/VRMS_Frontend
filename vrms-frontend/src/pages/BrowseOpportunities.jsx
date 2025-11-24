@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Filter, Calendar, MapPin, Tag, Users, Clock, Mail, Phone, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, Filter, Calendar, MapPin, Tag, Users, Clock, Mail, Phone, X, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import ngoService from '../api/ngoService';
+import volunteerApi from '../api/volunteerApi';
 import { matchingService } from '../api/api';
  
 // Helper function to decode JWT token
@@ -18,8 +20,11 @@ const decodeJWT = (token) => {
     return null;
   }
 };
+
+
  
 const BrowseOpportunities = () => {
+  const navigate = useNavigate();
   const [opportunities, setOpportunities] = useState([]);
   const [filteredOpportunities, setFilteredOpportunities] = useState([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
@@ -51,24 +56,78 @@ const BrowseOpportunities = () => {
     'Human Rights'
   ];
  
+  // Function to load registered opportunities
+  const loadRegisteredOpportunities = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        console.log('No token found, skipping registered opportunities load');
+        return new Set();
+      }
+
+      const decodedToken = decodeJWT(token);
+      const volunteerId = decodedToken?.userId || decodedToken?.user_id;
+      
+      if (!volunteerId) {
+        console.log('No volunteer ID found in token');
+        return new Set();
+      }
+
+      console.log('Loading registered opportunities for volunteer:', volunteerId);
+      const response = await volunteerApi.get(`/users/volunteers/${volunteerId}/postings`);
+      
+      console.log('Registered opportunities response:', response.data);
+      
+      // Extract opportunity IDs from the response
+      const registeredIds = new Set();
+      if (response.data) {
+        const data = response.data;
+        
+        // Handle the actual backend format: { volunteerId, postings: Set<Long>, count }
+        if (data.postings) {
+          // Convert the postings Set/Array to a Set of IDs
+          const postingsArray = Array.isArray(data.postings) ? data.postings : Array.from(data.postings);
+          postingsArray.forEach(postingId => {
+            registeredIds.add(postingId);
+          });
+        }
+      }
+      
+      console.log('Extracted registered opportunity IDs:', Array.from(registeredIds));
+      return registeredIds;
+      
+    } catch (error) {
+      console.error('Error loading registered opportunities:', error);
+      return new Set();
+    }
+  };
+
   useEffect(() => {
-    const fetchOpportunities = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        console.log("Fetching opportunities from NGO service...");
-        const response = await ngoService.get('/postings');
+        console.log("Fetching opportunities and registered applications...");
+        const [opportunitiesResponse, registeredIds] = await Promise.all([
+          ngoService.get('/postings'),
+          loadRegisteredOpportunities()
+        ]);
         
-        console.log("Opportunities loaded:", response.data);
+        console.log("Opportunities loaded:", opportunitiesResponse.data);
+        console.log("Registered opportunities loaded:", Array.from(registeredIds));
         
         // Handle both array response or paginated response
-        const opportunitiesData = Array.isArray(response.data) ? response.data : response.data.content || [];
+        const opportunitiesData = Array.isArray(opportunitiesResponse.data) 
+          ? opportunitiesResponse.data 
+          : opportunitiesResponse.data.content || [];
         
         setOpportunities(opportunitiesData);
         setFilteredOpportunities(opportunitiesData);
+        setRegisteredOpportunities(registeredIds);
+        
       } catch (error) {
-        console.error("Error fetching opportunities:", error);
+        console.error("Error fetching data:", error);
         setError("Failed to load opportunities. Please try again later.");
         
         // Fallback to empty array
@@ -78,11 +137,53 @@ const BrowseOpportunities = () => {
         setIsLoading(false);
       }
     };
- 
-    fetchOpportunities();
+
+    fetchData();
   }, []);
- 
-  const handleFilterChange = (field, value) => {
+
+  // Add effect to refresh data when returning from MyApplications after withdrawal
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && localStorage.getItem('opportunities_need_refresh') === 'true') {
+        console.log('🔄 Refreshing opportunities data after withdrawal...');
+        localStorage.removeItem('opportunities_need_refresh');
+        
+        // Refetch data to get updated spot counts
+        const refreshData = async () => {
+          try {
+            setIsLoading(true);
+            console.log("Refreshing opportunities after withdrawal...");
+            const [opportunitiesResponse, registeredIds] = await Promise.all([
+              ngoService.get('/postings'),
+              loadRegisteredOpportunities()
+            ]);
+            
+            const opportunitiesData = Array.isArray(opportunitiesResponse.data) 
+              ? opportunitiesResponse.data 
+              : opportunitiesResponse.data.content || [];
+            
+            setOpportunities(opportunitiesData);
+            setFilteredOpportunities(opportunitiesData);
+            setRegisteredOpportunities(registeredIds);
+            
+            console.log("✅ Opportunities refreshed with updated spot counts");
+          } catch (error) {
+            console.error("Error refreshing opportunities:", error);
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        
+        refreshData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);  const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
  
@@ -128,6 +229,7 @@ const BrowseOpportunities = () => {
         
         // Handle response - should be array of PostingResponse
         const recommendedData = Array.isArray(response.data) ? response.data : [];
+        
         setFilteredOpportunities(recommendedData);
         
       } else {
@@ -336,29 +438,56 @@ const BrowseOpportunities = () => {
   // };
   
   const handleApply = async (opportunityId) => {
+    console.log('🔥 Apply button clicked for opportunity:', opportunityId);
     try {
       setRegistrationLoading(opportunityId);
+      console.log('⏳ Setting loading state for:', opportunityId);
+      
       const token = localStorage.getItem('access_token');
       if (!token) {
+        console.log('❌ No token found');
         showNotification('Please login to register for opportunities', 'error');
         return;
       }
+      console.log('✅ Token found:', token ? 'Present' : 'Missing');
+      
       const decodedToken = decodeJWT(token);
+      console.log('🔍 Decoded token:', decodedToken);
+      
       const volunteerId = decodedToken?.userId || decodedToken?.user_id;
+      console.log('👤 Volunteer ID:', volunteerId);
+      
       if (!volunteerId) {
+        console.log('❌ No volunteer ID found in token');
         showNotification('Invalid session. Please login again.', 'error');
         return;
       }
+      
       if (registeredOpportunities.has(opportunityId)) {
+        console.log('⚠️ Already registered for this opportunity');
         showNotification('You are already registered for this opportunity!', 'warning');
         return;
       }
-      const response = await matchingService.post(
-        `/matching/register/${volunteerId}/${opportunityId}`,
+      
+      console.log(`🚀 Starting registration: volunteer ${volunteerId} for posting ${opportunityId}`);
+      console.log('📡 API URL:', `/users/volunteers/${volunteerId}/postings/${opportunityId}`);
+      
+      const response = await volunteerApi.post(
+        `/users/volunteers/${volunteerId}/postings/${opportunityId}`,
         null,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setRegisteredOpportunities(prev => new Set([...prev, opportunityId]));
+      
+      console.log('✅ Registration successful:', response);
+      
+      // Update registered opportunities state immediately
+      setRegisteredOpportunities(prev => {
+        const newSet = new Set([...prev, opportunityId]);
+        console.log('Updated registered opportunities:', Array.from(newSet));
+        return newSet;
+      });
+      
+      // Update opportunity slots in local state
       setFilteredOpportunities(prev => prev.map(opp =>
         opp.id === opportunityId
           ? { ...opp, volunteersSpotLeft: Math.max(0, (opp.volunteersSpotLeft ?? 0) - 1) }
@@ -369,18 +498,28 @@ const BrowseOpportunities = () => {
           ? { ...opp, volunteersSpotLeft: Math.max(0, (opp.volunteersSpotLeft ?? 0) - 1) }
           : opp
       ));
+      
       showNotification('Successfully registered for this opportunity! 🎉', 'success');
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('❌ Registration error details:', error);
+      console.error('❌ Error response:', error.response);
+      console.error('❌ Error message:', error.message);
+      
       if (error.response) {
         const { status, data } = error.response;
-        const err = data || {};
-        const errorMessage = err.error || '';
-        const fullMessage = err.message || '';
+        console.error(`❌ HTTP Status: ${status}`);
+        console.error('❌ Response data:', data);
+        
+        const errorMessage = data?.error || data?.message || '';
+        const fullMessage = data?.message || data?.error || '';
+        console.error('❌ Parsed error messages:', { errorMessage, fullMessage });
+        
         if (status === 400) {
           if (
             errorMessage.toLowerCase().includes('already registered') ||
-            fullMessage.toLowerCase().includes('already registered')
+            fullMessage.toLowerCase().includes('already registered') ||
+            errorMessage.toLowerCase().includes('already registered for this posting') ||
+            fullMessage.toLowerCase().includes('already registered for this posting')
           ) {
             showNotification('You are already registered for this opportunity! ✅', 'warning');
             setRegisteredOpportunities(prev => new Set([...prev, opportunityId]));
@@ -397,8 +536,22 @@ const BrowseOpportunities = () => {
           localStorage.removeItem('access_token');
         } else if (status === 404) {
           showNotification('Opportunity or volunteer not found. 📝', 'error');
+        } else if (status === 500) {
+          // Handle IllegalStateException from backend (maps to 500)
+          if (
+            errorMessage.toLowerCase().includes('already registered') ||
+            fullMessage.toLowerCase().includes('already registered') ||
+            errorMessage.toLowerCase().includes('already registered for this posting') ||
+            fullMessage.toLowerCase().includes('already registered for this posting')
+          ) {
+            showNotification('You are already registered for this opportunity! ✅', 'warning');
+            setRegisteredOpportunities(prev => new Set([...prev, opportunityId]));
+          } else {
+            showNotification('Server error occurred. Please try again later. 🔧', 'error');
+            console.error('🔧 Backend Issue: The API endpoint exists but has a server-side error. Check backend logs.');
+          }
         } else {
-          showNotification('Registration failed. Please try again later. ⚠️', 'error');
+          showNotification(`Registration failed (${status}). Please try again later. ⚠️`, 'error');
         }
       } else {
         showNotification('Network error. Please check your connection. 🌐', 'error');
@@ -415,6 +568,22 @@ const BrowseOpportunities = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-6xl mx-auto">
+        {/* Back Button */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+          className="mb-6"
+        >
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 text-gray-700 hover:text-blue-600 hover:bg-blue-50"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-medium">Back</span>
+          </button>
+        </motion.div>
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}

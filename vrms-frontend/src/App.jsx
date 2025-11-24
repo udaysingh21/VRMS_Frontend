@@ -14,6 +14,10 @@ import AboutPage from "./pages/AboutPage";
 import BrowseOpportunities from './pages/BrowseOpportunities';
 import OpportunityCreation from './pages/OpportunityCreation';
 import OpportunityManagement from './pages/OpportunityManagement';
+import VolunteerApplications from './pages/VolunteerApplications';
+import AnalyticsReports from './pages/AnalyticsReports';
+import MyApplications from './pages/MyApplications';
+import ActivityHistory from './pages/ActivityHistory';
 
 
 export default function App() {
@@ -34,7 +38,11 @@ export default function App() {
       <Route path="/register/corporate" element={<CorporateRegister />} />
       <Route path="/create-opportunity" element={<OpportunityCreation />} />
       <Route path="/manage-opportunities" element={<OpportunityManagement />} />
-                <Route path="/opportunities" element={<BrowseOpportunities />} />
+      <Route path="/volunteer-applications/:ngoId" element={<VolunteerApplications />} />
+      <Route path="/analytics-reports/:ngoId" element={<AnalyticsReports />} />
+      <Route path="/my-applications/:volunteerId" element={<MyApplications />} />
+      <Route path="/activity-history/:volunteerId" element={<ActivityHistory />} />
+      <Route path="/opportunities" element={<BrowseOpportunities />} />
 
 
     </Routes>

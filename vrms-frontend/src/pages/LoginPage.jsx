@@ -8,9 +8,12 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
 
     try {
       const response = await api.post("/users/login", { email, password });
@@ -18,8 +21,6 @@ export default function LoginPage() {
 
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("refresh_token", data.refresh_token);
-
-      alert("Login successful!");
 
       const payload = JSON.parse(atob(data.access_token.split(".")[1]));
       console.log("🔍 Login JWT Payload:", payload);
@@ -30,6 +31,7 @@ export default function LoginPage() {
       console.log("🔍 Extracted role:", role);
       console.log("🔍 Extracted userId:", userId);
 
+      // Redirect immediately after successful login
       switch (role) {
         case "NGO":
           console.log("Redirecting to NGO dashboard with ID:", userId);
@@ -46,11 +48,19 @@ export default function LoginPage() {
           navigate(`/volunteer-dashboard/${userId}`);
           break;
       }
+
     } catch (error) {
       console.error("Login Error:", error);
       const errorMsg =
         error.response?.data?.message || "Login failed. Please try again.";
-      alert(errorMsg);
+      setErrorMessage(errorMsg);
+      
+      // Clear error message after 5 seconds
+      setTimeout(() => {
+        setErrorMessage("");
+      }, 5000);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -75,6 +85,18 @@ export default function LoginPage() {
             User Login
           </h2>
 
+          {/* Error message */}
+          {errorMessage && (
+            <motion.div
+              className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              {errorMessage}
+            </motion.div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-5">
             <input
               type="email"
@@ -96,9 +118,14 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
+              disabled={isLoading}
+              className={`w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg shadow-lg transition-all ${
+                isLoading 
+                  ? 'opacity-75 cursor-not-allowed' 
+                  : 'hover:shadow-xl transform hover:scale-105'
+              }`}
             >
-              Login
+              {isLoading ? 'Logging in...' : 'Login'}
             </button>
           </form>
 

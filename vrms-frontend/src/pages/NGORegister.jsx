@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { motion } from "framer-motion";
 import api from "../api/api";
 
 export default function NGORegister() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -17,12 +19,14 @@ export default function NGORegister() {
     websiteUrl: "",
     verificationStatus: "pending",
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
 
     const body = {
       name: formData.name,
@@ -41,14 +45,25 @@ export default function NGORegister() {
 
     try {
       const response = await api.post("/users/register/ngo", body);
-      alert("NGO registered successfully!");
+      
       console.log("Server Response:", response.data);
+      
+      // Get user ID from response and redirect immediately
+      const userId = response.data.user?.id || response.data.id;
+      if (userId) {
+        navigate(`/ngo-dashboard/${userId}`);
+      } else {
+        navigate("/ngo-dashboard");
+      }
+      
     } catch (error) {
       console.error("Registration Error:", error);
       alert(
         error.response?.data?.message ||
           "Registration failed. Please try again."
       );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -185,9 +200,14 @@ export default function NGORegister() {
             {/* Submit */}
             <button
               type="submit"
-              className="w-full py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
+              disabled={isLoading}
+              className={`w-full py-3 bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold rounded-lg shadow-lg transition-all ${
+                isLoading 
+                  ? 'opacity-75 cursor-not-allowed' 
+                  : 'hover:shadow-xl transform hover:scale-105'
+              }`}
             >
-              Register
+              {isLoading ? 'Registering...' : 'Register'}
             </button>
           </form>
         </motion.div>
